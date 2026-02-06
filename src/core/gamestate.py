@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Tuple
 from copy import deepcopy
-from .data_classes import PlayerPublicInfo, SidePot, Action
+from .data_classes import PlayerPublicInfo, Pot, Action
 
 
 class PublicGamestate:
@@ -18,7 +18,7 @@ class PublicGamestate:
         button_position: Index of the dealer button
         community_cards: Visible community cards
         total_pot: Total chips in all pots
-        side_pots: List of side pots (empty if only main pot)
+        pots: List of pots (index 0 is main pot, 1+ are side pots)
         blinds: Current (small_blind, big_blind) amounts
         blinds_schedule: Schedule of blind increases
         minimum_raise_amount: Minimum valid raise amount
@@ -33,7 +33,7 @@ class PublicGamestate:
         button_position: int,
         community_cards: List[str],
         total_pot: int,
-        side_pots: List[SidePot],
+        pots: List[Pot],
         blinds: Tuple[int, int],
         blinds_schedule: Dict[int, Tuple[int, int]],
         minimum_raise_amount: int,
@@ -48,7 +48,7 @@ class PublicGamestate:
             button_position: Dealer button position
             community_cards: List of community cards
             total_pot: Total pot size
-            side_pots: List of side pots
+            pots: List of pots (index 0 is main pot, 1+ are side pots)
             blinds: Current blinds tuple
             blinds_schedule: Dictionary mapping round to blinds
             minimum_raise_amount: Minimum raise amount
@@ -60,7 +60,7 @@ class PublicGamestate:
         self.button_position = button_position
         self.community_cards = community_cards
         self.total_pot = total_pot
-        self.side_pots = side_pots
+        self.pots = pots
         self.blinds = blinds
         self.blinds_schedule = blinds_schedule
         self.minimum_raise_amount = minimum_raise_amount
@@ -101,7 +101,7 @@ class PublicGamestate:
         else:
             raise ValueError(f"Invalid number of community cards: {num_community_cards}")
 
-    def get_current_bet(self) -> int:
+    def get_bet_to_call(self) -> int:
         """Get the current bet amount to call
 
         Returns:
@@ -121,7 +121,7 @@ class PublicGamestate:
             button_position=self.button_position,
             community_cards=self.community_cards.copy(),
             total_pot=self.total_pot,
-            side_pots=deepcopy(self.side_pots),
+            pots=deepcopy(self.pots),
             blinds=self.blinds,
             blinds_schedule=self.blinds_schedule.copy(),
             minimum_raise_amount=self.minimum_raise_amount,

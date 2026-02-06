@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+import time
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -9,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.core.table import Table
 from src.bots.random_bot import RandomBot
 from src.bots.call_bot import CallBot
-
+from src.bots.exploiter_bot import ExploiterBot
 
 def print_game_state(table: Table, street: str = ""):
     """Print current game state"""
@@ -35,47 +36,74 @@ def main():
     print("=" * 60)
 
     # Create bots
-    bot1 = RandomBot(player_index=0)
-    bot2 = CallBot(player_index=1)
-    bot3 = RandomBot(player_index=2)
-    bot4 = CallBot(player_index=3)
+    bot1 = ExploiterBot(player_index=0)
+    bot2 = ExploiterBot(player_index=1)
+    bot3 = ExploiterBot(player_index=2)
+    bot4 = ExploiterBot(player_index=3)
+    bot5 = ExploiterBot(player_index=4)
+    bot6 = ExploiterBot(player_index=5)
+    bot7 = ExploiterBot(player_index=6)
+    bot8 = ExploiterBot(player_index=7)
 
     # Define blinds schedule
     blinds_schedule = {
         1: (10, 20),
         5: (25, 50),
-        10: (50, 100),
     }
 
+    begin = time.time()
+
+    
     # Create table
     table = Table(
-        players=[bot1, bot2, bot3, bot4],
-        starting_stack=1000,
+        players=[bot1, bot2, bot3, bot4, bot5, bot6, bot7, bot8],
+        starting_stack=2000000,
         blinds_schedule=blinds_schedule,
-        max_rounds=15,
-        seed=42
+        seed=0
     )
 
-    print(f"\nStarting game with {len(table.players)} players")
-    print(f"Starting stack: 1000 chips")
-    print(f"Starting blinds: {table.blinds}")
+    # Play a few hands
+    for hand_num in range(1, 10):
+        print(f"\n{'#'*60}")
+        print(f"# HAND {hand_num}")
+        print(f"{'#'*60}")
 
-    # Initialize first hand
-    table.reset_hand_state()
-    table.deal_hole_cards()
-    table.collect_blinds()
+        # Play the hand and get results
+        result = table.simulate_hand()
 
-    print_game_state(table, "PREFLOP")
+        # Display hand results
+        print_game_state(table, f"Hand Complete - {result['final_street'].upper()}")
 
-    print("\nThis is a skeleton implementation!")
-    print("Next steps:")
-    print("  1. Implement betting round logic")
-    print("  2. Integrate HandJudge for showdown")
-    print("  3. Integrate PlayerJudge for action validation")
-    print("  4. Add street progression (flop, turn, river)")
-    print("  5. Add pot distribution")
-    print("  6. Add tournament progression")
-    print("\nThe framework is ready for you to build the game engine!")
+        if result['showdown']:
+            print("\n--- SHOWDOWN ---")
+            print("\nActive players at showdown:")
+            for winner_idx in result['winners'].keys():
+                from src.helpers.hand_judge import HandJudge
+                hand_eval = HandJudge.evaluate_hand(
+                    table.player_hole_cards[winner_idx],
+                    table.community_cards
+                )
+                print(f"  Player {winner_idx} ({table.players[winner_idx].__class__.__name__}): "
+                      f"{table.player_hole_cards[winner_idx]} - {hand_eval[0].replace('_', ' ').title()}")
+        elif result['ended_early']:
+            print(f"\n--- Hand ended after {result['final_street']} (all but one folded) ---")
+            
+
+        # Display winners
+        print("\nWinners:")
+        for winner_idx, (hand_name, amount) in result['winners'].items():
+            hand_display = hand_name.replace('_', ' ').title() if hand_name != "uncontested" else "Uncontested"
+            print(f"  Player {winner_idx} wins {amount} chips with {hand_display}")
+
+        # Check for eliminations
+        if result['eliminated']:
+            print(f"\nPlayers eliminated: {result['eliminated']}")
+            
+
+    print("\n" + "="*60)
+    print("DEMO COMPLETE!")
+    print("="*60)
+    print(time.time()-begin)
 
 
 if __name__ == "__main__":

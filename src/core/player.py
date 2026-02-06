@@ -11,7 +11,7 @@ class Player(ABC):
     """Abstract base class for poker bot players
 
     Each bot implementation should inherit from this class and implement
-    the make_decision method. External utilities will measure and restrict
+    the get_action method. External utilities will measure and restrict
     resource usage (CPU time, memory) during decision making.
 
     Attributes:
@@ -27,15 +27,15 @@ class Player(ABC):
         self.player_index = player_index
 
     @abstractmethod
-    def make_decision(
+    def get_action(
         self,
-        public_gamestate: 'PublicGamestate',
+        gamestate: 'PublicGamestate',
         hole_cards: Tuple[str, str]
     ) -> Tuple[str, int]:
         """Make a decision given current game state
 
         Args:
-            public_gamestate: Current public game state visible to all players
+            gamestate: Current public game state visible to all players
             hole_cards: This player's two hole cards (e.g., ('Ah', 'Kd'))
 
         Returns:

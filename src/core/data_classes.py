@@ -5,18 +5,26 @@ from typing import List
 
 
 @dataclass
-class SidePot:
-    """Represents a side pot in the game
+class Pot:
+    """Represents a pot in the game
+
+    Pots are organized as a list where:
+    - pots[0] is the main pot (all active players eligible)
+    - pots[1+] are side pots created when players go all-in
+
+    When a player goes all-in for less than other bets, a side pot is created
+    for the additional money, and the all-in player is NOT in eligible_players
+    for that side pot.
 
     Attributes:
-        amount: Total chips in this side pot
+        amount: Total chips in this pot
         eligible_players: List of player indices eligible to win this pot
     """
     amount: int
     eligible_players: List[int]
 
     def __repr__(self) -> str:
-        return f"SidePot(amount={self.amount}, eligible={self.eligible_players})"
+        return f"Pot(amount={self.amount}, eligible={self.eligible_players})"
 
 
 @dataclass
@@ -28,14 +36,18 @@ class PlayerPublicInfo:
         current_bet: Amount bet in current betting round
         active: Whether player is still in the hand
         busted: Whether player has been eliminated from tournament
+        is_all_in: Whether player is all-in (has committed all chips)
     """
     stack: int
     current_bet: int
     active: bool
     busted: bool
+    is_all_in: bool = False
 
     def __repr__(self) -> str:
         status = "BUSTED" if self.busted else ("ACTIVE" if self.active else "FOLDED")
+        if self.is_all_in:
+            status += " (ALL-IN)"
         return f"PlayerPublicInfo(stack={self.stack}, bet={self.current_bet}, {status})"
 
 

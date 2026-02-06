@@ -35,6 +35,8 @@ class DeckManager:
             for rank in self.RANKS
         ]
         self.burn_cards = []
+        if self.seed is not None:
+            self.seed += 1
 
     def shuffle_deck(self, seed: Optional[int] = None) -> None:
         """Shuffle the deck
@@ -42,11 +44,10 @@ class DeckManager:
         Args:
             seed: Random seed for shuffling (uses instance seed if None)
         """
-        if seed is not None:
-            self.seed = seed
-
         if self.seed is not None:
             random.seed(self.seed)
+        if seed is not None:
+            random.seed(seed)
 
         random.shuffle(self.remaining_cards)
 

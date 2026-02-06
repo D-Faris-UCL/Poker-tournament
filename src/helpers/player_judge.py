@@ -191,8 +191,8 @@ class PlayerJudge:
         current_bet = max((info.current_bet for _, info in active_players), default=0)
 
         for idx, info in active_players:
-            # Skip players who are all-in (stack == 0)
-            if info.stack == 0:
+            # Skip players who are all-in
+            if info.is_all_in:
                 continue
 
             # If player hasn't matched current bet, betting not complete
@@ -225,7 +225,7 @@ class PlayerJudge:
 
         # Skip inactive players and players who are all-in
         attempts = 0
-        while (not player_infos[next_idx].active or player_infos[next_idx].stack == 0) and attempts < num_players:
+        while (not player_infos[next_idx].active or player_infos[next_idx].is_all_in) and attempts < num_players:
             next_idx = (next_idx + 1) % num_players
             attempts += 1
 

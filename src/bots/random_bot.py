@@ -13,30 +13,32 @@ class RandomBot(Player):
     This is a baseline bot for testing the environment.
     Real competition bots should use strategy!
     """
+    def __init__(self, player_index):
+        super().__init__(player_index)
 
-    def make_decision(
+    def get_action(
         self,
-        public_gamestate: PublicGamestate,
+        gamestate: PublicGamestate,
         hole_cards: Tuple[str, str]
     ) -> Tuple[str, int]:
         """Make a random legal decision
 
         Args:
-            public_gamestate: Current public game state
+            gamestate: Current public game state
             hole_cards: This player's hole cards
 
         Returns:
             Tuple of (action_type, amount)
         """
-        player_info = public_gamestate.player_public_infos[self.player_index]
-        current_bet = public_gamestate.get_current_bet()
+        player_info = gamestate.player_public_infos[self.player_index]
+        current_bet = gamestate.get_bet_to_call()
 
         # Get legal actions
         legal = PlayerJudge.get_legal_actions(
             self.player_index,
-            public_gamestate.player_public_infos,
+            gamestate.player_public_infos,
             current_bet,
-            public_gamestate.minimum_raise_amount
+            gamestate.minimum_raise_amount
         )
 
         # Build list of legal action types

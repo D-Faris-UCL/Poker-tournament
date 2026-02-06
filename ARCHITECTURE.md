@@ -1,379 +1,579 @@
-# Poker Tournament Environment - Architecture Document
+# Poker Tournament Architecture
 
-## System Overview
+## Overview
 
-This is a complete poker tournament environment designed for AI bot competitions. The architecture follows a clean separation between game logic, player bots, and helper utilities.
+This is a complete No-Limit Texas Hold'em tournament simulator designed for AI bot development and competitive play. The architecture emphasizes clean separation of concerns, information security, and extensibility.
 
-## Component Hierarchy
+## System Architecture
 
 ```
-Tournament
-    └── Table (Game Orchestrator)
-        ├── Players (Bot implementations)
-        ├── DeckManager (Card management)
-        ├── PublicGamestate (Visible information)
-        ├── PlayerJudge (Action validation)
-        └── HandJudge (Hand evaluation & pot distribution)
+┌─────────────────────────────────────────────────────────────┐
+│                     Tournament Framework                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+         ┌────▼────┐                    ┌─────▼─────┐
+         │  Table  │◄───────────────────┤  Players  │
+         │ (Core)  │                    │  (Bots)   │
+         └────┬────┘                    └───────────┘
+              │
+    ┌─────────┼─────────┐
+    │         │         │
+┌───▼────┐ ┌──▼──┐ ┌───▼──────┐
+│ Deck   │ │Pots │ │ Gamestate│
+│Manager │ │     │ │ (Public) │
+└────────┘ └─────┘ └──────────┘
+              │
+    ┌─────────┼─────────┐
+    │         │         │
+┌───▼────┐ ┌──▼────────┐
+│  Hand  │ │  Player   │
+│ Judge  │ │  Judge    │
+└────────┘ └───────────┘
 ```
 
 ## Core Components
 
-### 1. Table ([src/core/table.py](src/core/table.py))
+### 1. Table (`src/core/table.py`)
 
-**Purpose**: Main game orchestrator that manages all game state and coordinates between components.
+**Role:** Main game orchestrator and state manager
 
-**Key Responsibilities**:
-- Manage tournament rounds and blinds schedule
-- Track player stacks and game state
-- Deal cards through DeckManager
-- Collect bets and manage pots
-- Track hand history
-- Generate PublicGamestate for players
+**Key Responsibilities:**
+- Manages the full tournament lifecycle
+- Coordinates betting rounds across all streets
+- Handles pot distribution and side pot creation
+- Tracks chip counts and verifies conservation
+- Enforces blind schedules and button rotation
 
-**Key Methods**:
-- `get_public_gamestate()`: Create safe view for players
-- `reset_hand_state()`: Prepare for new hand
-- `deal_hole_cards()`: Deal cards to players
-- `deal_flop/turn/river()`: Deal community cards
-- `collect_blinds()`: Post small and big blinds
-- `advance_button()`: Move dealer button
+**Critical Methods:**
 
-**State Management**:
+| Method | Purpose |
+|--------|---------|
+| `simulate_hand()` | Orchestrates a complete hand from deal to showdown |
+| `run_betting_round(street)` | Executes betting logic for a single street |
+| `_reconcile_bets_to_pots()` | Creates side pots for all-in scenarios |
+| `end_hand()` | Evaluates hands and distributes winnings |
+| `collect_blinds()` | Posts small and big blinds |
+| `check_eliminations()` | Identifies and marks busted players |
+
+**State Tracking:**
+- `players`: List of Player instances
+- `player_hole_cards`: Private cards (List[Optional[Tuple[str, str]]])
+- `player_public_infos`: Public information for each player
+- `community_cards`: Board cards
+- `pots`: List of Pot objects (index 0 = main pot, 1+ = side pots)
+- `total_pot`: Aggregate chip total across all pots
+- `blinds_schedule`: Dict mapping round number to (SB, BB)
+- `current_hand_history`: Actions by street
+- `hand_contributions`: Cumulative bets per player for pot calculation
+
+**Betting Round Algorithm:**
+1. Reset street-specific state (bets, actor position)
+2. Track last aggressor (player who bet/raised)
+3. Loop through players collecting actions
+4. Validate actions via PlayerJudge
+5. Execute actions and update state
+6. Continue until all active players match bet or are all-in
+7. Reconcile bets into appropriate pots
+
+**Side Pot Creation:**
+When players are all-in with different stack sizes, the system creates multiple pots:
+- Finds all unique bet levels
+- Creates a pot for each level with eligible players
+- Only players who contributed at that level can win that pot
+- Handles complex multi-way all-in scenarios automatically
+
+### 2. Player (`src/core/player.py`)
+
+**Role:** Abstract base class for all bot implementations
+
+**Interface:**
 ```python
-- round_number: Current tournament round
-- players: List of Player objects
-- player_hole_cards: Hidden hole cards (List[Tuple[str, str]])
-- player_public_infos: Public player information
-- button_position: Dealer button index
-- community_cards: Board cards
-- total_pot: Current pot size
-- side_pots: Side pots for all-in situations
-- blinds: Current (SB, BB) tuple
-- blinds_schedule: Mapping of round -> blinds
-- current_hand_history: Actions by street
-- previous_hand_histories: Historical hand data
-```
-
-### 2. PublicGamestate ([src/core/gamestate.py](src/core/gamestate.py))
-
-**Purpose**: Sanitized view of game state given to players to prevent information leakage.
-
-**Security Design**:
-- Contains ONLY information visible at a real poker table
-- No access to other players' hole cards
-- No access to remaining deck cards
-- Immutable snapshot of current game state
-
-**Available Information**:
-- Round number and blinds
-- All players' public information (stacks, bets, active status)
-- Community cards
-- Pot sizes
-- Hand history (all past actions)
-- Minimum raise amount
-
-**Utility Methods**:
-- `get_active_players_count()`: Count active players
-- `get_current_street()`: Determine current betting round
-- `get_current_bet()`: Get amount to call
-- `copy()`: Deep copy for safety
-
-### 3. Player ([src/core/player.py](src/core/player.py))
-
-**Purpose**: Abstract base class for all bot implementations.
-
-**Interface**:
-```python
-def make_decision(
+@abstractmethod
+def get_action(
     self,
-    public_gamestate: PublicGamestate,
+    gamestate: PublicGamestate,
     hole_cards: Tuple[str, str]
 ) -> Tuple[str, int]:
-    """
-    Args:
-        public_gamestate: Current visible game state
-        hole_cards: This player's two hole cards
-
-    Returns:
-        (action_type, amount) where:
-        - action_type: 'fold', 'check', 'call', 'bet', 'raise'
-        - amount: chips for bet/raise (0 for fold/check/call)
-    """
+    """Return (action_type, amount)"""
+    pass
 ```
 
-**Bot Implementation Requirements**:
-1. Inherit from Player class
-2. Implement make_decision() method
-3. Return valid action tuple
-4. Handle all game states gracefully
-5. Stay within resource limits (enforced externally)
+**Action Types:**
+- `'fold'`: Exit the hand (amount = 0)
+- `'check'`: Pass action when no bet to call (amount = 0)
+- `'call'`: Match current bet (amount = chips needed to match)
+- `'bet'`: Make first bet on a street (amount = bet size)
+- `'raise'`: Increase existing bet (amount = additional chips to add)
+- `'all-in'`: Bet entire remaining stack (amount = remaining stack)
 
-### 4. DeckManager ([src/core/deck_manager.py](src/core/deck_manager.py))
+**Design Principles:**
+- Bots receive only PUBLIC information (no other players' hole cards)
+- Invalid actions are corrected automatically by PlayerJudge
+- Bots don't need to track game state - it's provided each action
+- Simple interface enables rapid bot development
 
-**Purpose**: Manages 52-card deck with shuffling and dealing.
+**Attributes:**
+- `player_index`: Position at table (0 to N-1)
 
-**Card Representation**:
-- Format: `<rank><suit>` (e.g., 'Ah' = Ace of hearts)
-- Ranks: 2-9, T(10), J, Q, K, A
-- Suits: h(hearts), d(diamonds), c(clubs), s(spades)
+### 3. PublicGamestate (`src/core/gamestate.py`)
 
-**Key Methods**:
-- `reset_deck()`: Reset to full 52 cards
-- `shuffle_deck(seed)`: Shuffle with optional seed for reproducibility
-- `deal_card()`: Deal one card
-- `burn_card()`: Burn a card (not dealt to players)
-- `deal_multiple(n)`: Deal n cards at once
+**Role:** Information container passed to bots
 
-**Features**:
-- Deterministic shuffling with seed support
-- Tracks remaining and burned cards
-- Raises errors on invalid operations
+**Purpose:** Prevents information leakage by exposing only visible game state
 
-### 5. HandJudge ([src/helpers/hand_judge.py](src/helpers/hand_judge.py))
+**Attributes:**
 
-**Purpose**: Evaluates poker hands and determines winners.
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `round_number` | int | Current tournament round |
+| `player_public_infos` | List[PlayerPublicInfo] | Public info for all players |
+| `button_position` | int | Dealer button index |
+| `community_cards` | List[str] | Board cards (0-5 cards) |
+| `total_pot` | int | Total chips in all pots |
+| `pots` | List[Pot] | Individual pots with eligibility |
+| `blinds` | Tuple[int, int] | Current (small_blind, big_blind) |
+| `blinds_schedule` | Dict[int, Tuple[int, int]] | Future blind levels |
+| `minimum_raise_amount` | int | Minimum valid raise size |
+| `current_hand_history` | Dict[str, List[Action]] | Actions by street |
+| `previous_hand_histories` | List[Dict[...]] | Past hand histories |
 
-**Hand Rankings** (lowest to highest):
-1. High Card
-2. One Pair
-3. Two Pair
-4. Three of a Kind
-5. Straight
-6. Flush
-7. Full House
-8. Four of a Kind
-9. Straight Flush
-10. Royal Flush
+**Utility Methods:**
+- `get_current_street()`: Returns 'preflop', 'flop', 'turn', or 'river'
+- `get_bet_to_call()`: Current bet amount to match
+- `get_active_players_count()`: Number of players still in hand
+- `get_non_busted_players_count()`: Players remaining in tournament
+- `copy()`: Deep copy for safe manipulation
 
-**Key Methods**:
-- `evaluate_hand(hole_cards, community_cards)`: Evaluate best 5-card hand
-- `compare_hands(hand1, hand2)`: Compare two hands (returns 1, 0, -1)
-- `determine_winners(hole_cards, community, eligible)`: Find winner(s) from eligible players
-- `distribute_pot(amount, winners, stacks)`: Split pot among winners
+### 4. Data Classes (`src/core/data_classes.py`)
 
-**Algorithm**:
-- Evaluates best 5-card combination from 7 cards
-- Returns hand type and kickers for tiebreaking
-- Handles all edge cases (wheel straight, flush tiebreakers, etc.)
-
-### 6. PlayerJudge ([src/helpers/player_judge.py](src/helpers/player_judge.py))
-
-**Purpose**: Validates player actions and ensures legal play.
-
-**Validation Rules**:
-- Invalid action types → fold or check
-- Bets/raises below minimum → check or call
-- Bets/raises above stack → all-in
-- Fold when check available → check (anti-mistake)
-
-**Key Methods**:
-- `get_legal_actions()`: Get all legal actions for player
-- `validate_action()`: Validate and correct player action
-- `is_betting_complete()`: Check if betting round is done
-- `get_next_actor()`: Find next player to act
-
-**Design Philosophy**:
-- Graceful error handling (no game crashes from bad bots)
-- Conservative corrections (protect players from mistakes)
-- Clear action semantics
-
-## Data Classes ([src/core/data_classes.py](src/core/data_classes.py))
-
-### SidePot
-```python
-@dataclass
-class SidePot:
-    amount: int
-    eligible_players: List[int]
-```
-
-### PlayerPublicInfo
+#### PlayerPublicInfo
 ```python
 @dataclass
 class PlayerPublicInfo:
-    stack: int           # Current chips
-    current_bet: int     # Bet this round
-    active: bool         # In current hand
+    stack: int           # Remaining chips
+    current_bet: int     # Bet on current street
+    active: bool         # Still in current hand
     busted: bool         # Eliminated from tournament
+    is_all_in: bool      # All chips committed
 ```
 
-### Action
+#### Pot
+```python
+@dataclass
+class Pot:
+    amount: int                  # Chips in pot
+    eligible_players: List[int]  # Player indices who can win
+```
+
+#### Action
 ```python
 @dataclass
 class Action:
     player_index: int
-    action_type: str    # 'fold', 'check', 'call', 'bet', 'raise', 'all-in'
+    action_type: str
     amount: int
-
-    # Serialization methods for logging/replay
-    def to_dict() -> dict
-    def from_dict(data: dict) -> Action
 ```
 
-## Information Flow
+### 5. DeckManager (`src/core/deck_manager.py`)
 
-```
-1. Table creates hand
-   └── Shuffle deck
-   └── Deal hole cards
-   └── Post blinds
+**Role:** Card deck management with reproducible shuffling
 
-2. For each betting round:
-   └── Table generates PublicGamestate
-   └── Table calls Player.make_decision(gamestate, hole_cards)
-   └── PlayerJudge validates action
-   └── Table updates game state
-   └── Repeat until betting complete
+**Card Notation:**
+- Ranks: `2, 3, 4, 5, 6, 7, 8, 9, T, J, Q, K, A`
+- Suits: `h` (hearts), `d` (diamonds), `c` (clubs), `s` (spades)
+- Example: `'Ah'` = Ace of hearts, `'Ks'` = King of spades
 
-3. At showdown:
-   └── HandJudge evaluates all hands
-   └── HandJudge determines winners
-   └── HandJudge distributes pots
+**Features:**
+- Seeded random shuffling for deterministic games
+- Burn card tracking
+- Remaining card counting
 
-4. Next hand:
-   └── Update stacks
-   └── Check for busted players
-   └── Advance button
-   └── Repeat from step 1
-```
+**Key Methods:**
+- `shuffle_deck()`: Randomize deck order
+- `deal_card()`: Draw next card
+- `burn_card()`: Remove card without dealing
+- `deal_multiple(n)`: Deal N cards at once
+- `cards_remaining()`: Check deck status
 
-## Security Model
+### 6. HandJudge (`src/helpers/hand_judge.py`)
 
-### Data Isolation
-- Players receive **only** PublicGamestate
-- No access to Table's internal state
-- No access to other players' hole cards
-- No access to deck state
+**Role:** Hand evaluation and winner determination
 
-### Action Validation
-- All actions validated by PlayerJudge
-- Invalid actions auto-corrected
-- No way to cheat through invalid actions
+**Hand Rankings (weakest to strongest):**
+1. High Card
+2. One Pair
+3. Two Pair
+4. Three of a Kind
+5. Straight (includes wheel: A-2-3-4-5)
+6. Flush
+7. Full House
+8. Four of a Kind
+9. Straight Flush
+10. Royal Flush (A-K-Q-J-T suited)
 
-### External Resource Control (TODO)
-- CPU time limits per decision
-- Memory limits per bot
-- Process isolation
-- Sandboxed execution
+**Key Methods:**
 
-## Extensibility Points
-
-### Custom Bots
-Inherit from `Player` and implement strategy:
 ```python
-class MyBot(Player):
-    def make_decision(self, gamestate, hole_cards):
-        # Your strategy here
-        return (action, amount)
+evaluate_hand(
+    hole_cards: Tuple[str, str],
+    community_cards: List[str]
+) -> Tuple[str, Tuple[int, ...]]
+```
+Returns hand name and card values for comparison.
+
+```python
+compare_hands(
+    hand1: Tuple[str, Tuple[int, ...]],
+    hand2: Tuple[str, Tuple[int, ...]]
+) -> int
+```
+Returns -1 (hand1 wins), 0 (tie), or 1 (hand2 wins).
+
+```python
+determine_winners(
+    all_hole_cards: List[Optional[Tuple[str, str]]],
+    community_cards: List[str],
+    eligible_players: List[int]
+) -> List[int]
+```
+Finds all winners from eligible players (handles ties).
+
+**Tie-Breaking:**
+- Compares hand ranks first
+- If ranks equal, compares card values (kickers)
+- Supports split pots for identical hands
+
+### 7. PlayerJudge (`src/helpers/player_judge.py`)
+
+**Role:** Action validation and rule enforcement
+
+**Purpose:** Don't trust bot actions - validate and correct them
+
+**Key Methods:**
+
+```python
+validate_action(
+    player_idx: int,
+    action_type: str,
+    amount: int,
+    player_infos: List[PlayerPublicInfo],
+    current_bet: int,
+    minimum_raise_amount: int
+) -> Tuple[str, int]
+```
+Returns corrected (action_type, amount) tuple.
+
+**Validation Rules:**
+- Can't fold when check is available
+- Can't bet when someone already bet (must raise/call/fold)
+- Can't raise below minimum_raise_amount
+- Insufficient chips → forced all-in
+- Invalid amounts → corrected to legal values
+
+```python
+get_legal_actions(
+    player_idx: int,
+    player_infos: List[PlayerPublicInfo],
+    current_bet: int,
+    minimum_raise_amount: int
+) -> Dict[str, any]
+```
+Returns dictionary of legal actions with constraints:
+```python
+{
+    'can_check': bool,
+    'can_call': bool,
+    'call_amount': int,
+    'can_bet': bool,
+    'min_bet': int,
+    'max_bet': int,
+    'can_raise': bool,
+    'min_raise': int,
+    'max_raise': int,
+    'can_fold': bool
+}
 ```
 
-### Tournament Variations
-- Modify blinds schedule
-- Add antes
-- Change starting stacks
-- Implement knockout bounties
-- Add rebuys/add-ons
+**Other Utilities:**
+- `get_next_actor()`: Find next non-busted, non-all-in player
+- `is_betting_complete()`: Check if round should end
 
-### Logging & Analysis
-- Hook into hand history
-- Track player statistics
-- Replay hands
-- Generate visualizations
+## Game Flow
+
+### Hand Lifecycle
+
+```
+1. SETUP
+   ├─ reset_hand_state()
+   ├─ deal_hole_cards()
+   └─ collect_blinds()
+
+2. PREFLOP
+   ├─ run_betting_round('preflop')
+   └─ Check if hand continues
+
+3. FLOP (if multiple players active)
+   ├─ deal_flop() [3 cards]
+   ├─ run_betting_round('flop')
+   └─ Check if hand continues
+
+4. TURN (if multiple players active)
+   ├─ deal_turn() [1 card]
+   ├─ run_betting_round('turn')
+   └─ Check if hand continues
+
+5. RIVER (if multiple players active)
+   ├─ deal_river() [1 card]
+   └─ run_betting_round('river')
+
+6. SHOWDOWN
+   ├─ end_hand() [evaluate & distribute]
+   ├─ check_eliminations()
+   └─ _finalize_hand() [advance button, update blinds]
+```
+
+### Betting Round Flow
+
+```
+START
+  │
+  ├─ Reset street bets to 0 (except preflop)
+  ├─ Set first actor (UTG or SB)
+  └─ Track last aggressor
+  │
+LOOP for each player:
+  │
+  ├─ Skip if not active or all-in
+  ├─ Get action from bot (get_action)
+  ├─ Validate action (PlayerJudge)
+  ├─ Execute action (update state)
+  ├─ Update aggressor if bet/raise
+  └─ Move to next player
+  │
+CHECK end conditions:
+  │
+  ├─ Only one player with chips? → END
+  ├─ All matched current bet? → Check if returned to aggressor
+  └─ Returned to aggressor? → END
+  │
+END
+  │
+  └─ Reconcile bets into pots
+```
+
+## Information Security
+
+### What Bots CAN See:
+- Their own hole cards
+- Community cards
+- All players' stack sizes
+- All players' current bets
+- Who is active/folded/all-in/busted
+- Pot sizes and side pot structure
+- Betting history (actions and amounts)
+- Blind schedule and current blinds
+
+### What Bots CANNOT See:
+- Other players' hole cards
+- Cards remaining in deck
+- Future cards to be dealt
+- Internal table state (e.g., `hand_contributions`)
+
+### How Security is Enforced:
+1. Bots receive `PublicGamestate` object (no private data)
+2. Hole cards passed separately for current player only
+3. Table maintains private state inaccessible to bots
+4. No direct access to Table object from Player methods
+
+## Chip Conservation
+
+The system guarantees no chips are created or destroyed:
+
+**Tracking:**
+```python
+total_chips = (player_stacks) + (current_bets) + (total_pot) + (sum of pots)
+```
+
+**Verification:**
+```python
+table.verify_chip_count()  # Returns (is_valid, expected, actual)
+```
+
+**Tested Scenarios:**
+- Simple heads-up pots
+- All-in with side pots
+- Split pots (ties)
+- Multiple side pots with different winners
+- Complex multi-way all-ins
+
+## Side Pot Algorithm
+
+When players go all-in with different stack sizes, multiple pots are created:
+
+### Example Scenario:
+- Player A: 100 chips (all-in)
+- Player B: 300 chips (all-in)
+- Player C: 500 chips (call)
+
+### Pot Creation:
+1. **Main Pot:** 300 chips (100 × 3 players)
+   - Eligible: A, B, C
+
+2. **Side Pot 1:** 400 chips (200 × 2 players)
+   - Eligible: B, C
+
+3. **Side Pot 2:** 200 chips (200 × 1 player)
+   - Eligible: C
+
+### Distribution:
+- Player C wins all pots: Gets 900 chips
+- Player B wins with A folded: Gets Side Pot 1 + Side Pot 2 (600), A gets Main Pot (300)
+- Player A wins all: Gets Main Pot (300), remaining distributed among B/C
+
+**Implementation:**
+The `_reconcile_bets_to_pots()` method automatically handles this by:
+1. Sorting bet levels
+2. Creating a pot for each level
+3. Tracking eligibility based on contribution
+
+## Blind Schedule
+
+Blinds increase over time to force action:
+
+```python
+blinds_schedule = {
+    1: (10, 20),       # Rounds 1-49: 10/20 blinds
+    50: (25, 50),      # Rounds 50-99: 25/50 blinds
+    100: (50, 100),    # Rounds 100+: 50/100 blinds
+}
+```
+
+**Implementation:**
+- Table checks `round_number` after each hand
+- If new blind level exists in schedule, updates `self.blinds`
+- Blinds automatically apply at start of next hand
+
+## Tournament Lifecycle
+
+```
+INITIALIZATION
+  ├─ Create Player instances (bots)
+  ├─ Define blinds schedule
+  └─ Create Table with starting stacks
+
+TOURNAMENT LOOP
+  │
+  FOR each hand:
+    │
+    ├─ simulate_hand()
+    ├─ Check eliminations
+    ├─ Increment round
+    ├─ Advance button
+    └─ Update blinds
+    │
+    UNTIL only one player remains
+  │
+END
+  │
+  └─ Winner is last non-busted player
+```
 
 ## Testing Strategy
 
-### Unit Tests ([tests/test_components.py](tests/test_components.py))
-- DeckManager: Shuffle, deal, burn
-- HandJudge: Hand evaluation, comparison
-- PlayerJudge: Action validation
-- Data classes: Serialization
+### Unit Tests (`tests/test_components.py`)
+- Deck shuffling and dealing
+- Hand evaluation (all 10 hand types)
+- Hand comparison and tie-breaking
+- Action validation
+- Data class serialization
 
-### Integration Tests (TODO)
-- Full hand simulation
-- Multi-round tournaments
-- Edge cases (all-ins, side pots)
+### Integration Tests (`tests/test_integration.py`)
+- **Chip Conservation:** Run 100+ hands, verify no leaks
+- **Pot Distribution:** Test all side pot scenarios
+- **Split Pots:** Verify correct splitting with remainders
+- **Complex All-Ins:** Multi-way all-ins with different stacks
 
-### Bot Tests (TODO)
-- Bot decision making
-- Resource usage
-- Error handling
+## Design Patterns
 
-## Next Steps for Full Implementation
+### 1. Strategy Pattern
+Players implement the `Player` interface, allowing different bot strategies to be swapped.
 
-1. **Game Engine**
-   - Betting round loop
-   - Street progression
-   - Showdown logic
-   - Pot distribution with side pots
+### 2. Facade Pattern
+`Table` provides a simple interface (`simulate_hand()`) that orchestrates complex subsystems.
 
-2. **Tournament Manager**
-   - Multi-table support
-   - Player elimination
-   - Prize structure
-   - Statistics tracking
+### 3. Data Transfer Object (DTO)
+`PublicGamestate` packages public information for transfer to bots.
 
-3. **Resource Monitor**
-   - CPU time limits
-   - Memory limits
-   - Process sandboxing
+### 4. Validator Pattern
+`PlayerJudge` validates and corrects bot actions before execution.
 
-4. **Visualization**
-   - Hand replayer
-   - Live tournament view
-   - Statistics dashboard
-
-5. **Testing Suite**
-   - Comprehensive unit tests
-   - Integration tests
-   - Bot validation tests
-   - Stress testing
-
-## Design Principles
-
-1. **Separation of Concerns**: Each component has a single, well-defined responsibility
-2. **Security First**: No information leakage to bots
-3. **Graceful Degradation**: Invalid actions corrected, not crashed
-4. **Testability**: Each component independently testable
-5. **Extensibility**: Easy to add new bots and features
-6. **Reproducibility**: Seed support for deterministic testing
-7. **Clean Interfaces**: Simple, well-documented APIs
-
-## File Structure Summary
-
-```
-src/
-├── core/
-│   ├── table.py           - Main game orchestrator
-│   ├── gamestate.py       - Public game state
-│   ├── player.py          - Bot base class
-│   ├── deck_manager.py    - Card management
-│   └── data_classes.py    - Data structures
-├── helpers/
-│   ├── hand_judge.py      - Hand evaluation
-│   └── player_judge.py    - Action validation
-└── bots/
-    ├── random_bot.py      - Random action bot
-    └── call_bot.py        - Always-call bot
-
-examples/
-└── simple_game.py         - Basic usage example
-
-tests/
-└── test_components.py     - Unit tests
-```
+### 5. Judge Pattern
+`HandJudge` provides objective evaluation without bias.
 
 ## Performance Considerations
 
-- **Deck Operations**: O(1) for dealing
-- **Hand Evaluation**: O(1) for 7-card evaluation
-- **Action Validation**: O(1) per action
-- **Winner Determination**: O(n) where n = active players
+**Optimizations:**
+- Minimal copying (only when creating PublicGamestate)
+- No external dependencies (pure Python)
+- Efficient hand evaluation (7-card combinations)
 
-## License & Usage
+**Scalability:**
+- Supports 2-10 players (typical poker table)
+- Can simulate thousands of hands quickly
+- Deterministic mode (seeded) for reproducible benchmarks
 
-Designed for educational use in university AI competitions.
-Students encouraged to:
-- Build creative bot strategies
-- Contribute improvements
-- Share ideas and approaches
-- Learn game theory and AI concepts
+## Extension Points
+
+### Adding New Bot Types:
+1. Extend `Player` class
+2. Implement `get_action()` method
+3. Use `gamestate` and `hole_cards` to make decisions
+4. Return valid action tuple
+
+### Adding New Features:
+- **Antes:** Modify `collect_blinds()` to collect antes
+- **Different Poker Variants:** Extend `HandJudge` with new hand rankings
+- **Tournament Payouts:** Add payout structure to Table
+- **Hand Logging:** Extend `current_hand_history` tracking
+- **Real-time Visualization:** Hook into betting round callbacks
+
+## File Structure
+
+```
+src/
+├── core/                      # Game engine
+│   ├── player.py             # Bot interface
+│   ├── table.py              # Game orchestrator
+│   ├── gamestate.py          # Public state
+│   ├── data_classes.py       # Core data structures
+│   └── deck_manager.py       # Card management
+├── helpers/                   # Utilities
+│   ├── hand_judge.py         # Hand evaluation
+│   └── player_judge.py       # Action validation
+└── bots/                      # Example implementations
+    ├── random_bot.py         # Random strategy
+    ├── call_bot.py           # Calling station
+    └── exploiter_bot.py      # Anti-calling-station
+```
+
+## Key Invariants
+
+1. **Chip Conservation:** Total chips constant throughout game
+2. **Information Hiding:** Bots never see private information
+3. **Action Validity:** Invalid actions automatically corrected
+4. **Pot Eligibility:** Players only eligible for pots they contributed to
+5. **Button Advancement:** Button always advances to next non-busted player
+6. **Blind Posting:** Blinds always posted before hand starts
+
+## Summary
+
+This architecture provides:
+- **Clean separation** between game logic and bot strategy
+- **Information security** preventing data leakage
+- **Correctness guarantees** through validation and testing
+- **Extensibility** via simple bot interface
+- **Production quality** with comprehensive test coverage
+
+The design enables rapid bot development while ensuring fair and correct gameplay.

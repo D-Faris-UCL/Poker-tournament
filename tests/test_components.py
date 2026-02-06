@@ -7,9 +7,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.deck_manager import DeckManager
-from src.core.data_classes import SidePot, PlayerPublicInfo, Action
+from src.core.data_classes import Pot, PlayerPublicInfo, Action
 from src.helpers.hand_judge import HandJudge
 from src.helpers.player_judge import PlayerJudge
+from src.core.table import Table
+from src.bots.random_bot import RandomBot
+from src.bots.call_bot import CallBot
 
 
 def test_deck_manager():
@@ -129,6 +132,49 @@ def test_player_judge():
     )
     assert action == 'check', "Below-minimum bet should convert to check"
 
+    # Test raise validation - exactly minimum raise
+    player_infos_raise = [
+        PlayerPublicInfo(stack=1000, current_bet=20, active=True, busted=False),
+        PlayerPublicInfo(stack=1000, current_bet=100, active=True, busted=False),
+    ]
+    # Current bet is 100, player has 20, min raise is 50
+    # To raise by minimum: need to reach 150 total (100 + 50)
+    # Player needs to add: 150 - 20 = 130 chips
+    action, amount = PlayerJudge.validate_action(
+        player_idx=0,
+        action_type='raise',
+        amount=130,  # Exactly minimum raise
+        player_infos=player_infos_raise,
+        current_bet=100,
+        minimum_raise=50
+    )
+    assert action == 'raise', "Should allow raise equal to minimum"
+    assert amount == 130, f"Raise amount should be 130, got {amount}"
+
+    # Test raise below minimum (should convert to call)
+    action, amount = PlayerJudge.validate_action(
+        player_idx=0,
+        action_type='raise',
+        amount=129,  # Below minimum raise
+        player_infos=player_infos_raise,
+        current_bet=100,
+        minimum_raise=50
+    )
+    assert action == 'call', "Below-minimum raise should convert to call"
+    assert amount == 80, f"Call amount should be 80, got {amount}"
+
+    # Test raise above minimum
+    action, amount = PlayerJudge.validate_action(
+        player_idx=0,
+        action_type='raise',
+        amount=180,  # Above minimum raise
+        player_infos=player_infos_raise,
+        current_bet=100,
+        minimum_raise=50
+    )
+    assert action == 'raise', "Should allow raise above minimum"
+    assert amount == 180, f"Raise amount should be 180, got {amount}"
+
     print("  [PASS] PlayerJudge tests passed")
 
 
@@ -136,10 +182,10 @@ def test_data_classes():
     """Test data classes"""
     print("Testing data classes...")
 
-    # Test SidePot
-    side_pot = SidePot(amount=100, eligible_players=[0, 1, 2])
-    assert side_pot.amount == 100
-    assert len(side_pot.eligible_players) == 3
+    # Test Pot
+    pot = Pot(amount=100, eligible_players=[0, 1, 2])
+    assert pot.amount == 100
+    assert len(pot.eligible_players) == 3
 
     # Test PlayerPublicInfo
     info = PlayerPublicInfo(stack=1000, current_bet=50, active=True, busted=False)

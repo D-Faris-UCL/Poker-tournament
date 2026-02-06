@@ -11,23 +11,23 @@ class CallBot(Player):
     This is a passive baseline bot for testing.
     """
 
-    def make_decision(
+    def get_action(
         self,
-        public_gamestate: PublicGamestate,
+        gamestate: PublicGamestate,
         hole_cards: Tuple[str, str]
     ) -> Tuple[str, int]:
         """Always call or check
 
         Args:
-            public_gamestate: Current public game state
+            gamestate: Current public game state
             hole_cards: This player's hole cards
 
         Returns:
             Tuple of (action_type, amount)
         """
-        player_info = public_gamestate.player_public_infos[self.player_index]
-        current_bet = public_gamestate.get_current_bet()
-        amount_to_call = current_bet - player_info.current_bet
+        player_info = gamestate.player_public_infos[self.player_index]
+        bet_to_call = gamestate.get_bet_to_call()
+        amount_to_call = bet_to_call - player_info.current_bet
 
         if amount_to_call == 0:
             return ('check', 0)
