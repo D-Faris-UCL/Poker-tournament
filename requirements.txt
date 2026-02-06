@@ -1,0 +1,3 @@
+# Poker Tournament Environment
+# No external dependencies - uses Python standard library only!
+# Python 3.7+ required
