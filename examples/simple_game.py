@@ -36,19 +36,17 @@ def main():
     print("=" * 60)
 
     # Create bots
-    bot1 = ExploiterBot(player_index=0)
-    bot2 = ExploiterBot(player_index=1)
-    bot3 = ExploiterBot(player_index=2)
-    bot4 = ExploiterBot(player_index=3)
-    bot5 = ExploiterBot(player_index=4)
-    bot6 = ExploiterBot(player_index=5)
-    bot7 = ExploiterBot(player_index=6)
-    bot8 = ExploiterBot(player_index=7)
+    bots = [
+        ExploiterBot(0),
+        CallBot(1),
+        RandomBot(2)
+    ]
 
     # Define blinds schedule
     blinds_schedule = {
         1: (10, 20),
-        5: (25, 50),
+        50: (20, 50),
+        100: (50, 100)
     }
 
     begin = time.time()
@@ -56,14 +54,13 @@ def main():
     
     # Create table
     table = Table(
-        players=[bot1, bot2, bot3, bot4, bot5, bot6, bot7, bot8],
-        starting_stack=2000000,
+        players=bots,
+        starting_stack=2000,
         blinds_schedule=blinds_schedule,
-        seed=0
     )
 
     # Play a few hands
-    for hand_num in range(1, 10):
+    for hand_num in range(1, 150):
         print(f"\n{'#'*60}")
         print(f"# HAND {hand_num}")
         print(f"{'#'*60}")
