@@ -1,7 +1,36 @@
 """Validates and corrects player actions"""
 
+import logging
+import sys
 from typing import Tuple, List
 from ..core.data_classes import PlayerPublicInfo
+
+# Log file for illegal move warnings (default: cwd)
+ILLEGAL_MOVES_LOG_PATH = "illegal_moves.log"
+
+_logger = logging.getLogger(__name__)
+_logger_configured = False
+
+
+def _ensure_logger_configured(log_path: str = ILLEGAL_MOVES_LOG_PATH) -> None:
+    """Configure illegal-move logger with file and console handlers (once)."""
+    global _logger_configured
+    if _logger_configured:
+        return
+    _logger.setLevel(logging.WARNING)
+    _logger.handlers.clear()
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    fh = logging.FileHandler(log_path, encoding="utf-8")
+    fh.setLevel(logging.WARNING)
+    fh.setFormatter(formatter)
+    _logger.addHandler(fh)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.WARNING)
+    ch.setFormatter(formatter)
+    _logger.addHandler(ch)
+    _logger_configured = True
 
 
 class PlayerJudge:
