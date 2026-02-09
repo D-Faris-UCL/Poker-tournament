@@ -1,10 +1,13 @@
 """Test basic functionality of poker components"""
 
+import logging
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import pytest
 
 from src.core.deck_manager import DeckManager
 from src.core.data_classes import Pot, PlayerPublicInfo, Action
@@ -178,6 +181,105 @@ def test_player_judge():
     print("  [PASS] PlayerJudge tests passed")
 
 
+PLAYER_JUDGE_LOGGER = "src.helpers.player_judge"
+
+
+def test_illegal_move_warning_bet_exceeds_stack(caplog):
+    """Warn when bet amount exceeds available stack (corrected to all-in)."""
+    player_infos = [
+        PlayerPublicInfo(stack=50, current_bet=0, active=True, busted=False),
+        PlayerPublicInfo(stack=1000, current_bet=0, active=True, busted=False),
+    ]
+    with caplog.at_level(logging.WARNING, logger=PLAYER_JUDGE_LOGGER):
+        action, amount = PlayerJudge.validate_action(
+            player_idx=0,
+            action_type="bet",
+            amount=200,
+            player_infos=player_infos,
+            current_bet=0,
+            minimum_raise=20,
+        )
+    assert action == "all-in" and amount == 50
+    assert any("bet exceeds stack" in r.message for r in caplog.records)
+
+
+def test_illegal_move_warning_raise_below_minimum(caplog):
+    """Warn when raise is below minimum (corrected to call)."""
+    player_infos = [
+        PlayerPublicInfo(stack=1000, current_bet=20, active=True, busted=False),
+        PlayerPublicInfo(stack=1000, current_bet=100, active=True, busted=False),
+    ]
+    with caplog.at_level(logging.WARNING, logger=PLAYER_JUDGE_LOGGER):
+        action, amount = PlayerJudge.validate_action(
+            player_idx=0,
+            action_type="raise",
+            amount=100,
+            player_infos=player_infos,
+            current_bet=100,
+            minimum_raise=50,
+        )
+    assert action == "call" and amount == 80
+    assert any("raise below minimum" in r.message for r in caplog.records)
+
+
+def test_illegal_move_warning_check_not_allowed(caplog):
+    """Warn when check is requested but there is a bet to call (corrected to fold)."""
+    player_infos = [
+        PlayerPublicInfo(stack=1000, current_bet=0, active=True, busted=False),
+        PlayerPublicInfo(stack=1000, current_bet=50, active=True, busted=False),
+    ]
+    with caplog.at_level(logging.WARNING, logger=PLAYER_JUDGE_LOGGER):
+        action, amount = PlayerJudge.validate_action(
+            player_idx=0,
+            action_type="check",
+            amount=0,
+            player_infos=player_infos,
+            current_bet=50,
+            minimum_raise=20,
+        )
+    assert action == "fold" and amount == 0
+    assert any("check not allowed" in r.message for r in caplog.records)
+
+
+def test_illegal_move_warning_bet_below_minimum(caplog):
+    """Warn when bet is below minimum (corrected to check)."""
+    player_infos = [
+        PlayerPublicInfo(stack=1000, current_bet=0, active=True, busted=False),
+        PlayerPublicInfo(stack=1000, current_bet=0, active=True, busted=False),
+    ]
+    with caplog.at_level(logging.WARNING, logger=PLAYER_JUDGE_LOGGER):
+        action, amount = PlayerJudge.validate_action(
+            player_idx=0,
+            action_type="bet",
+            amount=5,
+            player_infos=player_infos,
+            current_bet=0,
+            minimum_raise=20,
+        )
+    assert action == "check" and amount == 0
+    assert any("bet below minimum" in r.message for r in caplog.records)
+
+
+def test_illegal_move_warning_raise_exceeds_stack(caplog):
+    """Warn when raise amount exceeds stack (corrected to all-in)."""
+    # Player can raise (stack 200 > amount_to_call 100) but requests 500 > stack
+    player_infos = [
+        PlayerPublicInfo(stack=200, current_bet=0, active=True, busted=False),
+        PlayerPublicInfo(stack=1000, current_bet=100, active=True, busted=False),
+    ]
+    with caplog.at_level(logging.WARNING, logger=PLAYER_JUDGE_LOGGER):
+        action, amount = PlayerJudge.validate_action(
+            player_idx=0,
+            action_type="raise",
+            amount=500,
+            player_infos=player_infos,
+            current_bet=100,
+            minimum_raise=50,
+        )
+    assert action == "all-in" and amount == 200
+    assert any("raise exceeds stack" in r.message for r in caplog.records)
+
+
 def test_data_classes():
     """Test data classes"""
     print("Testing data classes...")
@@ -219,6 +321,7 @@ def main():
     test_hand_evaluation()
     test_hand_comparison()
     test_player_judge()
+    # Illegal move warning tests use pytest caplog; run with: pytest tests/test_components.py -k illegal_move_warning
     test_data_classes()
 
     print("\n" + "="*60)
