@@ -7,8 +7,6 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pytest
-
 from src.core.deck_manager import DeckManager
 from src.core.data_classes import Pot, PlayerPublicInfo, Action
 from src.helpers.hand_judge import HandJudge
