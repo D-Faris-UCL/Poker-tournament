@@ -8,9 +8,7 @@ import time
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.table import Table
-from src.bots.random_bot import RandomBot
-from src.bots.call_bot import CallBot
-from src.bots.exploiter_bot import ExploiterBot
+from src.helpers.player_loader import load_players
 
 def print_game_state(table: Table, street: str = ""):
     """Print current game state"""
@@ -35,12 +33,14 @@ def main():
     print("Poker Tournament Environment - Simple Example")
     print("=" * 60)
 
-    # Create bots
-    bots = [
-        ExploiterBot(0),
-        CallBot(1),
-        RandomBot(2)
-    ]
+    # Load all available bots
+    player_classes = load_players('src/bots')
+
+    # Create bot instances (using first 3 available bots)
+    bots = [player_class(i) for i, player_class in enumerate(player_classes)]
+
+    print(f"Loaded {len(player_classes)} player classes")
+    print(f"Playing with: {[bot.__class__.__name__ for bot in bots]}")
 
     # Define blinds schedule
     blinds_schedule = {

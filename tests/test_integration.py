@@ -8,8 +8,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.table import Table
 from src.core.data_classes import PlayerPublicInfo, Pot
-from src.bots.random_bot import RandomBot
-from src.bots.call_bot import CallBot
+from bots.random_bot.player import RandomBot
+from bots.call_bot.player import CallBot
 from src.helpers.hand_judge import HandJudge
 
 
