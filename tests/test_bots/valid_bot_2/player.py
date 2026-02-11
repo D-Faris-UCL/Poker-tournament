@@ -14,4 +14,11 @@ class ValidBot2(Player):
         hole_cards: Tuple[str, str]
     ) -> Tuple[str, int]:
         """Always call"""
-        return ('call', 0)
+        player_info = gamestate.player_public_infos[self.player_index]
+        bet_to_call = gamestate.get_bet_to_call()
+        amount_to_call = bet_to_call - player_info.current_bet
+
+        if amount_to_call == 0:
+            return ('check', 0)
+        else:
+            return ('call', 0)
