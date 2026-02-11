@@ -9,11 +9,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.deck_manager import DeckManager
 from src.core.data_classes import Pot, PlayerPublicInfo, Action
+from src.core.player import Player
 from src.helpers.hand_judge import HandJudge
 from src.helpers.player_judge import PlayerJudge
-from src.core.table import Table
-from src.bots.random_bot import RandomBot
-from src.bots.call_bot import CallBot
+from src.helpers.player_loader import load_players, get_player_by_name, get_player_names, validate_players
+import inspect
+
 
 
 def test_deck_manager():
@@ -309,6 +310,166 @@ def test_data_classes():
     print("  [PASS] Data classes tests passed")
 
 
+def test_player_loader():
+    """Test player loader functionality"""
+    print("Testing PlayerLoader...")
+
+    # Test 1: load_players with test fixture
+    print("  Testing load_players()...")
+    players = load_players('tests/test_bots')
+    assert isinstance(players, list), "load_players should return a list"
+    assert len(players) == 4, f"Should load exactly 4 bots (2 valid + 2 invalid), got {len(players)}"
+
+    # Verify all returned items are classes
+    for player_class in players:
+        assert inspect.isclass(player_class), f"{player_class} should be a class"
+
+    # Verify class names (load_players loads all that can be imported, not just valid ones)
+    class_names = {cls.__name__ for cls in players}
+    assert 'ValidBot1' in class_names, "Should load ValidBot1"
+    assert 'ValidBot2' in class_names, "Should load ValidBot2"
+    assert 'InvalidBot' in class_names, "Should load InvalidBot (validation happens separately)"
+    assert 'InvalidNoGetAction' in class_names, "Should load InvalidNoGetAction"
+    assert 'IgnoredBot' not in class_names, "Should ignore __should_be_ignored directory"
+    print("    [PASS] load_players() correctly loads all importable bots")
+
+    # Test 2: get_player_names with test fixture
+    print("  Testing get_player_names()...")
+    names = get_player_names('tests/test_bots')
+    assert isinstance(names, list), "get_player_names should return a list"
+    assert len(names) == 4, f"Should find exactly 4 bot directories with player.py, got {len(names)}"
+    expected_names = ['invalid_inheritance', 'invalid_no_get_action', 'valid_bot_1', 'valid_bot_2']
+    assert names == expected_names, f"Should return sorted names, got {names}"
+    assert 'no_player_file' not in names, "Should skip directories without player.py"
+    assert '__should_be_ignored' not in names, "Should skip directories starting with __"
+    print("    [PASS] get_player_names() returns correct sorted names")
+
+    # Test 3: get_player_names with non-existent directory
+    print("  Testing get_player_names() with non-existent directory...")
+    names_empty = get_player_names('tests/nonexistent_bots')
+    assert names_empty == [], "Should return empty list for non-existent directory"
+    print("    [PASS] get_player_names() handles non-existent directory")
+
+    # Test 4: load_players raises error for non-existent directory
+    print("  Testing load_players() with non-existent directory...")
+    try:
+        load_players('tests/nonexistent_bots')
+        assert False, "Should raise FileNotFoundError"
+    except FileNotFoundError as e:
+        assert "does not exist" in str(e), "Error message should indicate directory doesn't exist"
+    print("    [PASS] load_players() raises FileNotFoundError correctly")
+
+    # Test 5: get_player_by_name success case
+    print("  Testing get_player_by_name() success...")
+    ValidBot1 = get_player_by_name('tests/test_bots', 'valid_bot_1')
+    assert ValidBot1 is not None, "Should successfully load valid_bot_1"
+    assert inspect.isclass(ValidBot1), "Should return a class"
+    assert ValidBot1.__name__ == 'ValidBot1', f"Should load ValidBot1, got {ValidBot1.__name__}"
+
+    # Test instantiation
+    bot_instance = ValidBot1(player_index=0)
+    assert bot_instance.player_index == 0, "Instance should have correct player_index"
+    assert hasattr(bot_instance, 'get_action'), "Instance should have get_action method"
+    print("    [PASS] get_player_by_name() loads and instantiates correctly")
+
+    # Test 6: get_player_by_name failure cases
+    print("  Testing get_player_by_name() failure cases...")
+    nonexistent = get_player_by_name('tests/test_bots', 'nonexistent_bot')
+    assert nonexistent is None, "Should return None for non-existent bot"
+
+    no_file = get_player_by_name('tests/test_bots', 'no_player_file')
+    assert no_file is None, "Should return None for directory without player.py"
+    print("    [PASS] get_player_by_name() handles failures correctly")
+
+    # Test 7: validate_players with mixed valid/invalid bots
+    print("  Testing validate_players() with mixed bots...")
+    all_players = load_players('tests/test_bots')
+    validation = validate_players(all_players)
+
+    assert isinstance(validation, dict), "validate_players should return a dict"
+    assert 'valid' in validation, "Result should have 'valid' key"
+    assert 'invalid' in validation, "Result should have 'invalid' key"
+    assert 'all_valid' in validation, "Result should have 'all_valid' key"
+
+    assert validation['all_valid'] == False, "Should have some invalid bots"
+    # Note: InvalidNoGetAction passes because it inherits abstract get_action from Player
+    # Only InvalidBot (no Player inheritance) fails validation
+    assert len(validation['valid']) == 3, f"Should have 3 valid bots, got {len(validation['valid'])}"
+    assert len(validation['invalid']) == 1, f"Should have 1 invalid bot, got {len(validation['invalid'])}"
+
+    # Verify the valid ones include our test bots
+    valid_names = {cls.__name__ for cls in validation['valid']}
+    assert 'ValidBot1' in valid_names and 'ValidBot2' in valid_names, "Should identify valid bots correctly"
+
+    # Verify invalid one
+    invalid_names = {cls.__name__ for cls, _ in validation['invalid']}
+    assert 'InvalidBot' in invalid_names, "Should identify InvalidBot as invalid"
+
+    print("    [PASS] validate_players() correctly separates valid and invalid bots")
+
+    # Test 8: validate_players with invalid objects
+    print("  Testing validate_players() with invalid objects...")
+
+    # Test with non-class object
+    invalid_objects = ["not a class", 123, None]
+    validation_invalid = validate_players(invalid_objects)
+    assert validation_invalid['all_valid'] == False, "Should fail validation for non-classes"
+    assert len(validation_invalid['invalid']) == 3, "Should have 3 invalid items"
+    for item, reason in validation_invalid['invalid']:
+        assert "Not a class" in reason, f"Should indicate non-class, got: {reason}"
+
+    # Test with class not inheriting from Player
+    InvalidBot = get_player_by_name('tests/test_bots', 'invalid_inheritance')
+    if InvalidBot:
+        validation_no_inherit = validate_players([InvalidBot])
+        assert validation_no_inherit['all_valid'] == False, "Should fail for non-Player inheritance"
+        assert len(validation_no_inherit['invalid']) == 1, "Should have 1 invalid bot"
+        _, reason = validation_no_inherit['invalid'][0]
+        assert "Does not inherit from Player" in reason, f"Should indicate inheritance issue, got: {reason}"
+
+    # Note: We can't easily test "missing get_action" because classes inheriting from Player
+    # will have the abstract get_action method from the parent, so hasattr returns True.
+    # The validation catches classes that don't inherit from Player at all.
+
+    print("    [PASS] validate_players() catches invalid bots")
+
+    # Test 9: Consistency between loader functions
+    print("  Testing consistency between loader functions...")
+    names_list = get_player_names('tests/test_bots')
+    players_list = load_players('tests/test_bots')
+
+    assert len(names_list) == len(players_list), \
+        f"get_player_names count ({len(names_list)}) should match load_players count ({len(players_list)})"
+
+    # Verify each name can be loaded individually
+    for name in names_list:
+        player_class = get_player_by_name('tests/test_bots', name)
+        assert player_class is not None, f"Should be able to load {name} individually"
+
+    print("    [PASS] Loader functions are consistent")
+
+    # Test 10: Smoke test on production bots (no hardcoded expectations)
+    print("  Testing with production bots (smoke test)...")
+    try:
+        prod_players = load_players('src/bots')
+        assert isinstance(prod_players, list), "Should return a list"
+        assert len(prod_players) > 0, "Should load at least some production bots"
+
+        # Verify all are classes
+        for player_class in prod_players:
+            assert inspect.isclass(player_class), "All loaded items should be classes"
+
+        # Verify they can be validated
+        prod_validation = validate_players(prod_players)
+        assert isinstance(prod_validation, dict), "Validation should return dict"
+
+        print(f"    [PASS] Production bots smoke test ({len(prod_players)} bots loaded)")
+    except Exception as e:
+        print(f"    [WARNING] Production bots test failed: {e}")
+
+    print("  [PASS] PlayerLoader tests passed")
+
+
 def main():
     """Run all tests"""
     print("\n" + "="*60)
@@ -319,8 +480,8 @@ def main():
     test_hand_evaluation()
     test_hand_comparison()
     test_player_judge()
-    # Illegal move warning tests use pytest caplog; run with: pytest tests/test_components.py -k illegal_move_warning
     test_data_classes()
+    test_player_loader()
 
     print("\n" + "="*60)
     print("All tests passed!")

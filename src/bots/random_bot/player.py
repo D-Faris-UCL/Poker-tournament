@@ -2,9 +2,9 @@
 
 import random
 from typing import Tuple
-from ..core.player import Player
-from ..core.gamestate import PublicGamestate
-from ..helpers.player_judge import PlayerJudge
+from ...core.player import Player
+from ...core.gamestate import PublicGamestate
+from ...helpers.player_judge import PlayerJudge
 
 
 class RandomBot(Player):

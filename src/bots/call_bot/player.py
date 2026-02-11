@@ -1,8 +1,8 @@
 """Example bot that always calls or checks"""
 
 from typing import Tuple
-from ..core.player import Player
-from ..core.gamestate import PublicGamestate
+from ...core.player import Player
+from ...core.gamestate import PublicGamestate
 
 
 class CallBot(Player):
