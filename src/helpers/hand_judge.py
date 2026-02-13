@@ -101,14 +101,22 @@ class HandJudge:
         # Four of a Kind
         if counts_sorted[0] == 4:
             quad_rank = [r for r, c in rank_counts.items() if c == 4][0]
-            kicker = max([cls.RANK_VALUES[r] for r, c in rank_counts.items() if c != 4])
+            kickers = [cls.RANK_VALUES[r] for r, c in rank_counts.items() if c != 4]
+            kicker = max(kickers) if kickers else 0
             return "four_of_a_kind", [cls.RANK_VALUES[quad_rank], kicker]
 
         # Full House
-        if counts_sorted[0] == 3 and counts_sorted[1] >= 2:
-            trips_rank = [r for r, c in rank_counts.items() if c == 3][0]
-            pair_rank = max([cls.RANK_VALUES[r] for r, c in rank_counts.items() if c >= 2 and r != trips_rank])
-            return "full_house", [cls.RANK_VALUES[trips_rank], pair_rank]
+        if counts_sorted[0] == 3 and len(counts_sorted) > 1 and counts_sorted[1] >= 2:
+            # Get all trips (there might be two sets of trips)
+            trips_ranks = sorted([cls.RANK_VALUES[r] for r, c in rank_counts.items() if c == 3], reverse=True)
+            # Use highest trips
+            trips_value = trips_ranks[0]
+            # Get the rank string for the selected trips
+            trips_rank_str = [r for r, c in rank_counts.items() if cls.RANK_VALUES[r] == trips_value][0]
+            # Find best pair (could be second trips or highest pair)
+            pair_ranks = [cls.RANK_VALUES[r] for r, c in rank_counts.items() if c >= 2 and r != trips_rank_str]
+            pair_rank = max(pair_ranks) if pair_ranks else 0
+            return "full_house", [trips_value, pair_rank]
 
         # Flush
         if is_flush:
@@ -133,9 +141,14 @@ class HandJudge:
             return "three_of_a_kind", [cls.RANK_VALUES[trips_rank]] + kickers
 
         # Two Pair
-        if counts_sorted[0] == 2 and counts_sorted[1] == 2:
-            pairs = sorted([cls.RANK_VALUES[r] for r, c in rank_counts.items() if c == 2], reverse=True)
-            kicker = max([cls.RANK_VALUES[r] for r, c in rank_counts.items() if c == 1])
+        if counts_sorted[0] == 2 and len(counts_sorted) > 1 and counts_sorted[1] == 2:
+            # Get all pairs and limit to top 2
+            pairs = sorted([cls.RANK_VALUES[r] for r, c in rank_counts.items() if c == 2], reverse=True)[:2]
+            # Get kicker from remaining cards (either single cards or the 3rd pair if it exists)
+            pair_ranks_str = [r for r, c in rank_counts.items() if c == 2]
+            top_two_pair_ranks = [r for r in pair_ranks_str if cls.RANK_VALUES[r] in pairs]
+            kickers = [cls.RANK_VALUES[r] for r in rank_counts.keys() if r not in top_two_pair_ranks]
+            kicker = max(kickers) if kickers else 0
             return "two_pair", pairs + [kicker]
 
         # One Pair
