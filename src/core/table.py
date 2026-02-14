@@ -289,14 +289,15 @@ class Table:
             # If all matched and we've returned to the last aggressor (or no aggressor), done
             if all_matched and not first_action:
                 if last_aggressor_idx == -1:
+                    # No aggressor - need to go around the table once
+                    # Only break if we've returned to the first actor
+                    if self.actor_index == first_actor:
+                        break
+                elif self.player_public_infos[last_aggressor_idx].is_all_in:
+                    # If last aggressor is all-in, we can't return to them - just check if all matched
                     break
-                # If last aggressor is all-in, we can't return to them - just check if all matched
-                if last_aggressor_idx >= 0 and self.player_public_infos[last_aggressor_idx].is_all_in:
-                    break
-                if self.actor_index == last_aggressor_idx:
-                    break
-                # If we've gone full circle back to first actor, done
-                if self.actor_index == first_actor:
+                elif self.actor_index == last_aggressor_idx:
+                    # Returned to the last aggressor
                     break
 
             current_player_info = self.player_public_infos[self.actor_index]

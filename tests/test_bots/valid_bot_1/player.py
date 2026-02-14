@@ -1,35 +1,21 @@
-"""Example bot that makes random legal decisions"""
+"""Test bot 1 - Makes random legal actions"""
 
 import random
 from typing import Tuple
-from ..core.player import Player
-from ..core.gamestate import PublicGamestate
-from ..helpers.player_judge import PlayerJudge
+from src.core.player import Player
+from src.core.gamestate import PublicGamestate
+from src.helpers.player_judge import PlayerJudge
 
 
-class RandomBot(Player):
-    """Simple bot that makes random legal actions
-
-    This is a baseline bot for testing the environment.
-    Real competition bots should use strategy!
-    """
-    def __init__(self, player_index):
-        super().__init__(player_index)
+class ValidBot1(Player):
+    """Simple test bot that makes random legal actions"""
 
     def get_action(
         self,
         gamestate: PublicGamestate,
         hole_cards: Tuple[str, str]
     ) -> Tuple[str, int]:
-        """Make a random legal decision
-
-        Args:
-            gamestate: Current public game state
-            hole_cards: This player's hole cards
-
-        Returns:
-            Tuple of (action_type, amount)
-        """
+        """Make a random legal action"""
         player_info = gamestate.player_public_infos[self.player_index]
         current_bet = gamestate.get_bet_to_call()
 
@@ -53,7 +39,7 @@ class RandomBot(Player):
         if legal['raise']:
             possible_actions.append('raise')
 
-        # Always can fold (though usually suboptimal)
+        # Can always fold
         possible_actions.append('fold')
 
         # Choose random action
@@ -61,7 +47,6 @@ class RandomBot(Player):
 
         # Determine amount
         if action == 'bet':
-            # Random bet between min and max
             min_bet = legal['min_bet']
             max_bet = min(legal['max_bet'], player_info.stack)
             if max_bet >= min_bet:
@@ -71,7 +56,6 @@ class RandomBot(Player):
             return (action, amount)
 
         elif action == 'raise':
-            # Random raise between min and max
             amount_to_call = legal['call_amount']
             min_raise_total = legal['min_raise']
             max_raise = player_info.stack
@@ -88,7 +72,7 @@ class RandomBot(Player):
             return (action, amount)
 
         elif action == 'call':
-            return (action, 0)  # Amount will be determined by validator
+            return (action, 0)
 
         else:
             return (action, 0)

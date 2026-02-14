@@ -8,9 +8,7 @@ import time
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.table import Table
-from src.bots.random_bot import RandomBot
-from src.bots.call_bot import CallBot
-from src.bots.exploiter_bot import ExploiterBot
+from src.helpers.player_loader import load_players
 
 def print_game_state(table: Table, street: str = ""):
     """Print current game state"""
@@ -35,20 +33,20 @@ def main():
     print("Poker Tournament Environment - Simple Example")
     print("=" * 60)
 
-    # Create bots
-    bot1 = ExploiterBot(player_index=0)
-    bot2 = ExploiterBot(player_index=1)
-    bot3 = ExploiterBot(player_index=2)
-    bot4 = ExploiterBot(player_index=3)
-    bot5 = ExploiterBot(player_index=4)
-    bot6 = ExploiterBot(player_index=5)
-    bot7 = ExploiterBot(player_index=6)
-    bot8 = ExploiterBot(player_index=7)
+    # Load all available bots
+    player_classes = load_players('src/bots')
+
+    # Create bot instances (using first 3 available bots)
+    bots = [player_class(i) for i, player_class in enumerate(player_classes)]
+
+    print(f"Loaded {len(player_classes)} player classes")
+    print(f"Playing with: {[bot.__class__.__name__ for bot in bots]}")
 
     # Define blinds schedule
     blinds_schedule = {
         1: (10, 20),
-        5: (25, 50),
+        50: (20, 50),
+        100: (50, 100)
     }
 
     begin = time.time()
@@ -56,14 +54,13 @@ def main():
     
     # Create table
     table = Table(
-        players=[bot1, bot2, bot3, bot4, bot5, bot6, bot7, bot8],
-        starting_stack=2000000,
+        players=bots,
+        starting_stack=2000,
         blinds_schedule=blinds_schedule,
-        seed=0
     )
 
     # Play a few hands
-    for hand_num in range(1, 10):
+    for hand_num in range(1, 150):
         print(f"\n{'#'*60}")
         print(f"# HAND {hand_num}")
         print(f"{'#'*60}")

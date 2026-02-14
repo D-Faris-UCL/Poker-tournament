@@ -8,14 +8,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.table import Table
 from src.core.data_classes import PlayerPublicInfo, Pot
-from src.bots.random_bot import RandomBot
-from src.bots.call_bot import CallBot
 from src.helpers.hand_judge import HandJudge
+from src.helpers.player_loader import get_player_by_name
 
 
 def test_chip_leak():
     """Test for chip leaks across multiple game simulations"""
     print("Testing chip leak detection...")
+
+    # Load test bots
+    ValidBot1Class = get_player_by_name('tests/test_bots', 'valid_bot_1')
+    ValidBot2Class = get_player_by_name('tests/test_bots', 'valid_bot_2')
+
+    if not ValidBot1Class or not ValidBot2Class:
+        print("  [SKIP] Test bots not found")
+        return
 
     errors_found = []
 
@@ -30,10 +37,10 @@ def test_chip_leak():
         print(f"  Testing: {config['desc']}")
 
         for seed_val in range(config['seeds']):
-            bot1 = RandomBot(player_index=0)
-            bot2 = CallBot(player_index=1)
-            bot3 = RandomBot(player_index=2)
-            bot4 = CallBot(player_index=3)
+            bot1 = ValidBot1Class(player_index=0)
+            bot2 = ValidBot2Class(player_index=1)
+            bot3 = ValidBot1Class(player_index=2)
+            bot4 = ValidBot2Class(player_index=3)
 
             blinds_schedule = {
                 1: (10, 20),

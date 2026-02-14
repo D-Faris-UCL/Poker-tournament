@@ -25,6 +25,7 @@ class DeckManager:
         self.remaining_cards: List[str] = []
         self.burn_cards: List[str] = []
         self.seed: Optional[int] = seed
+        self.rng = random.Random()
         self.reset_deck()
 
     def reset_deck(self) -> None:
@@ -45,11 +46,11 @@ class DeckManager:
             seed: Random seed for shuffling (uses instance seed if None)
         """
         if self.seed is not None:
-            random.seed(self.seed)
+            self.rng.seed(self.seed)
         if seed is not None:
-            random.seed(seed)
+            self.rng.seed(seed)
 
-        random.shuffle(self.remaining_cards)
+        self.rng.shuffle(self.remaining_cards)
 
     def deal_card(self) -> str:
         """Deal one card from the top of the deck

@@ -1,7 +1,54 @@
 """Validates and corrects player actions"""
 
+import logging
+import sys
 from typing import Tuple, List
 from ..core.data_classes import PlayerPublicInfo
+
+# Log file for illegal move warnings (default: cwd)
+ILLEGAL_MOVES_LOG_PATH = "illegal_moves.log"
+
+_logger = logging.getLogger(__name__)
+_logger_configured = False
+
+
+def _ensure_logger_configured(log_path: str = ILLEGAL_MOVES_LOG_PATH) -> None:
+    """Configure illegal-move logger with file and console handlers (once)."""
+    global _logger_configured
+    if _logger_configured:
+        return
+    _logger.setLevel(logging.WARNING)
+    _logger.handlers.clear()
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    fh = logging.FileHandler(log_path, encoding="utf-8")
+    fh.setLevel(logging.WARNING)
+    fh.setFormatter(formatter)
+    _logger.addHandler(fh)
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging.WARNING)
+    ch.setFormatter(formatter)
+    _logger.addHandler(ch)
+    _logger_configured = True
+
+
+def _warn_illegal(
+    player_idx: int,
+    reason: str,
+    requested_action: str,
+    requested_amount: int,
+    corrected_action: str,
+    corrected_amount: int,
+) -> None:
+    """Log a warning for an illegal move that was corrected."""
+    _ensure_logger_configured()
+    msg = (
+        f"player={player_idx} | {reason} | "
+        f"requested=({requested_action}, {requested_amount}) -> "
+        f"corrected=({corrected_action}, {corrected_amount})"
+    )
+    _logger.warning(msg)
 
 
 class PlayerJudge:
@@ -87,12 +134,15 @@ class PlayerJudge:
 
         # Invalid action type defaults to fold
         if action_type not in cls.VALID_ACTIONS:
-            return ('fold', 0) if not legal['check'] else ('check', 0)
+            corrected = ('fold', 0) if not legal['check'] else ('check', 0)
+            _warn_illegal(player_idx, "invalid action type", action_type, amount, corrected[0], corrected[1])
+            return corrected
 
         # FOLD - always valid
         if action_type == 'fold':
             # Don't allow folding when check is available (anti-mistake)
             if legal['check']:
+                _warn_illegal(player_idx, "fold when check available", "fold", 0, "check", 0)
                 return ('check', 0)
             return ('fold', 0)
 
@@ -102,6 +152,7 @@ class PlayerJudge:
                 return ('check', 0)
             else:
                 # Can't check when there's a bet, must fold
+                _warn_illegal(player_idx, "check not allowed (bet to call)", "check", 0, "fold", 0)
                 return ('fold', 0)
 
         # CALL - match current bet
@@ -109,25 +160,32 @@ class PlayerJudge:
             if legal['call']:
                 return ('call', amount_to_call)
             elif amount_to_call == 0:
+                _warn_illegal(player_idx, "call when nothing to call", "call", amount, "check", 0)
                 return ('check', 0)
             elif player_stack < amount_to_call:
                 # Not enough to call, go all-in
+                _warn_illegal(player_idx, "call with insufficient stack", "call", amount, "all-in", player_stack)
                 return ('all-in', player_stack)
             else:
+                _warn_illegal(player_idx, "call not allowed", "call", amount, "fold", 0)
                 return ('fold', 0)
 
         # BET - when no current bet exists
         if action_type == 'bet':
             if not legal['bet']:
                 # Can't bet, check or fold
-                return ('check', 0) if legal['check'] else ('fold', 0)
+                corrected = ('check', 0) if legal['check'] else ('fold', 0)
+                _warn_illegal(player_idx, "bet not allowed", action_type, amount, corrected[0], corrected[1])
+                return corrected
 
             # Validate bet amount
             if amount < legal['min_bet']:
                 # Bet too small, convert to check
+                _warn_illegal(player_idx, "bet below minimum", action_type, amount, "check", 0)
                 return ('check', 0)
             elif amount > player_stack:
                 # Bet too large, go all-in
+                _warn_illegal(player_idx, "bet exceeds stack", action_type, amount, "all-in", player_stack)
                 return ('all-in', player_stack)
             else:
                 return ('bet', amount)
@@ -137,8 +195,10 @@ class PlayerJudge:
             if not legal['raise']:
                 # Can't raise, try to call or fold
                 if legal['call']:
+                    _warn_illegal(player_idx, "raise not allowed", "raise", amount, "call", amount_to_call)
                     return ('call', amount_to_call)
                 else:
+                    _warn_illegal(player_idx, "raise not allowed", "raise", amount, "fold", 0)
                     return ('fold', 0)
 
             total_bet_needed = amount + player_current_bet
@@ -146,9 +206,11 @@ class PlayerJudge:
             # Check if raise is large enough
             if total_bet_needed < legal['min_raise']:
                 # Raise too small, just call
+                _warn_illegal(player_idx, "raise below minimum", "raise", amount, "call", amount_to_call)
                 return ('call', amount_to_call)
             elif amount > player_stack:
                 # Raise too large, go all-in
+                _warn_illegal(player_idx, "raise exceeds stack", "raise", amount, "all-in", player_stack)
                 return ('all-in', player_stack)
             else:
                 return ('raise', amount)
@@ -156,7 +218,9 @@ class PlayerJudge:
         # ALL-IN - bet entire stack
         if action_type == 'all-in':
             if player_stack == 0:
-                return ('check', 0) if legal['check'] else ('fold', 0)
+                corrected = ('check', 0) if legal['check'] else ('fold', 0)
+                _warn_illegal(player_idx, "all-in with zero stack", "all-in", amount, corrected[0], corrected[1])
+                return corrected
             return ('all-in', player_stack)
 
         # Should never reach here
