@@ -1,6 +1,7 @@
 import pygame
 import sys
-from scene import GameScene
+from src.visualiser.scene import GameScene
+from src.core.gamestate import PublicGamestate
 
 FPS = 60
 
@@ -13,6 +14,20 @@ class Visualiser():
         self.clock = pygame.time.Clock()
 
     def run(self):
+        gamestate: PublicGamestate = PublicGamestate(
+            round_number=1,
+            player_public_infos=[],
+            button_position=0,
+            community_cards=["Kh", "9d", "Ac"],
+            total_pot=0,
+            pots=[],
+            blinds=(10, 20),
+            blinds_schedule={},
+            minimum_raise_amount=0,
+            current_hand_history={},
+            previous_hand_histories=[],
+        )
+        
         while True:
             events = pygame.event.get()
             for event in events:
@@ -24,8 +39,8 @@ class Visualiser():
                     self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
                     self.scene.screen = self.screen
                     
+            self.scene.update(gamestate)
             self.scene.handle_events(events)
-            self.scene.update()
             self.scene.draw()
             pygame.display.flip()
             self.clock.tick(FPS)

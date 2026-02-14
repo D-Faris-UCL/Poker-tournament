@@ -2,6 +2,7 @@ import pygame
 import math
 import numpy as np
 import random
+from src.core.gamestate import PublicGamestate
 
 # Following the AAP-64 colour palette: https://lospec.com/palette-list/aap-64
 
@@ -17,7 +18,7 @@ CARD_SIZE_MULTIPLIER = 2
 COLOURS = {
     "table_mat": (26, 122, 62),
     "table_card_position": (36, 82, 59),
-    "background_navy": (58, 68, 98),  # less saturated navy blue
+    "background_navy": (58, 68, 98),
     "wood": (66, 57, 52),
     "wood_highlight": (90, 78, 68),
     "wood_dark": (50, 43, 40),
@@ -27,7 +28,7 @@ COLOURS = {
 class GameScene():
     def __init__(self, screen: pygame.Surface):
         self.screen = screen
-
+        self.gamestate: PublicGamestate = None
         self.mouse_x = 0
         self.mouse_y = 0
         
@@ -37,6 +38,11 @@ class GameScene():
         self.card_kernel = pygame.image.load("assets/textures/cards/card_kernel.png")
         self.card_kernel_x = 56
         self.card_kernel_y = 80
+        
+        self.community_card_x = 0
+        self.community_card_y = 0
+        self.card_spacing = 10
+        self.card_radius = 10
 
         self.font_size = 14
         self.font = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size)
@@ -48,8 +54,8 @@ class GameScene():
                 self.mouse_x, self.mouse_y = event.pos
 
 
-    def update(self):
-        pass
+    def update(self, gamestate: PublicGamestate):
+        self.gamestate = gamestate
 
     def _update_scale(self):
         """Compute pixel scale and checker square size from screen size (16:9)."""
@@ -103,32 +109,30 @@ class GameScene():
         pygame.draw.rect(self.screen, COLOURS["table_mat"], (play_x, play_y, play_w, play_h))
         
         # Draw rounded rectangle for 5 cards
-        card_spacing = 10
-        card_radius = 10
-        community_card_x = play_x + play_w / 2 - 2.5 * (card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
-        community_card_y = play_y + play_h / 2 - 0.5 * (card_spacing + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
+        
+        self.community_card_x = play_x + play_w / 2 - 2.5 * (self.card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
+        self.community_card_y = play_y + play_h / 2 - 0.5 * (self.card_spacing + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
         
         pygame.draw.rect(
             self.screen, COLOURS["table_card_position"],
-            (community_card_x, community_card_y,
-            5 * (card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER),
-            (card_spacing + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)),
-            border_radius=card_radius,
+            (self.community_card_x, self.community_card_y,
+            5 * (self.card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER),
+            (self.card_spacing + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)),
+            border_radius=self.card_radius,
         )
 
     
-    def draw_table_cards(self):
+    def draw_table_cards(self): 
         # Positions in reference space; scale to screen
-        base_y = 100
-        for idx, card in enumerate(["Ah", "Ks", "Qd", "Jc", "Td", "9s", "8h", "7s"]):
-            base_x = 100 + idx * 100
-            x = int(base_x * self.pixel_scale_factor)
-            y = int(base_y * self.pixel_scale_factor)
-            self.draw_card_face_up(card, x, y)
-        self.draw_card_face_down(
-            int(900 * self.pixel_scale_factor),
-            int(base_y * self.pixel_scale_factor),
-        )
+        for i in range(5):
+            x = self.community_card_x + i * (self.card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER) + self.card_spacing / 2
+            y = self.community_card_y + self.card_spacing / 2
+            
+            if i < len(self.gamestate.community_cards):
+                self.draw_card_face_up(self.gamestate.community_cards[i], x, y)
+            else:
+                self.draw_card_face_down(x, y)
+        
     
     def draw_card_face_up(self, card:str, x:int, y:int):
         rank, suit = card[0], card[1]
@@ -147,7 +151,6 @@ class GameScene():
             i = self.card_kernel_x * 10
         else:
             i = 0
-            
         
         if suit == "h":
             j = 0
