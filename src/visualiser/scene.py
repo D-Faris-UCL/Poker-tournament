@@ -22,6 +22,7 @@ COLOURS = {
     "wood": (66, 57, 52),
     "wood_highlight": (90, 78, 68),
     "wood_dark": (50, 43, 40),
+    "button": (254, 243, 192),
 }
 
 
@@ -38,6 +39,11 @@ class GameScene():
         self.card_kernel = pygame.image.load("assets/textures/cards/card_kernel.png")
         self.card_kernel_x = 56
         self.card_kernel_y = 80
+        
+        self.play_x = 0
+        self.play_y = 0
+        self.play_w = 0
+        self.play_h = 0
         
         self.community_card_x = 0
         self.community_card_y = 0
@@ -70,6 +76,7 @@ class GameScene():
         self.draw_background()
         self.draw_table()
         self.draw_table_cards()
+        self.draw_button()
         self.draw_ui()
 
     def draw_background(self):
@@ -103,15 +110,15 @@ class GameScene():
         
         # Playing surface inset by 4px
         play_rect = inner_rect.inflate(-2 * squeeze, -2 * squeeze)
-        play_x, play_y = play_rect.x, play_rect.y
-        play_w, play_h = play_rect.width, play_rect.height
+        self.play_x, self.play_y = play_rect.x, play_rect.y
+        self.play_w, self.play_h = play_rect.width, play_rect.height
         
-        pygame.draw.rect(self.screen, COLOURS["table_mat"], (play_x, play_y, play_w, play_h))
+        pygame.draw.rect(self.screen, COLOURS["table_mat"], (self.play_x, self.play_y, self.play_w, self.play_h))
         
         # Draw rounded rectangle for 5 cards
         
-        self.community_card_x = play_x + play_w / 2 - 2.5 * (self.card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
-        self.community_card_y = play_y + play_h / 2 - 0.5 * (self.card_spacing + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
+        self.community_card_x = self.play_x + self.play_w / 2 - 2.5 * (self.card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
+        self.community_card_y = self.play_y + self.play_h / 2 - 0.5 * (self.card_spacing + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER)
         
         pygame.draw.rect(
             self.screen, COLOURS["table_card_position"],
@@ -176,6 +183,33 @@ class GameScene():
         card_scaled = pygame.transform.scale(card,(int(self.card_kernel_x * card_scale), int(self.card_kernel_y * card_scale)))
         
         self.screen.blit(card_scaled, (x, y))
+        
+    def draw_button(self):
+        # table has max 10 players with 1 at each end and 4 each long side
+        button = self.gamestate.button_position
+        button_radius = 20 * self.pixel_scale_factor
+
+        play_offset = 50 * self.pixel_scale_factor
+        spacing = self.play_w / 5
+
+        if button == 0:
+            center_x = self.play_x + play_offset
+            center_y = self.play_y + self.play_h / 2
+        elif button == 5:
+            center_x = self.play_x + self.play_w - play_offset
+            center_y = self.play_y + self.play_h / 2
+        elif button in range(1, 5):
+            center_x = self.play_x + spacing * button + play_offset
+            center_y = self.play_y + play_offset
+        elif button in range(6, 10):
+            center_x = self.play_x + self.play_w - spacing * (button - 5) - play_offset
+            center_y = self.play_y + self.play_h - play_offset
+        else:
+            center_x = self.play_x + self.play_w / 2
+            center_y = self.play_y + self.play_h / 2
+
+        pygame.draw.circle(self.screen, COLOURS["button"], (int(center_x), int(center_y)), button_radius)
+
         
 
     def draw_ui(self):
