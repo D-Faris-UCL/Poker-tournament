@@ -8,7 +8,7 @@ class Visualiser():
     def __init__(self, width:int=1080, height:int=720, title:str="Poker Tournament"):
         pygame.init()
         pygame.display.set_caption(title)
-        self.screen = pygame.display.set_mode((width, height))
+        self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
         self.scene = GameScene(self.screen)
         self.clock = pygame.time.Clock()
 
@@ -19,6 +19,10 @@ class Visualiser():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
+                    
+                if event.type == pygame.VIDEORESIZE:
+                    self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                    self.scene.screen = self.screen
                     
             self.scene.handle_events(events)
             self.scene.update()
