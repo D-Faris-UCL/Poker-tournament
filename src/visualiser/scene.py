@@ -304,17 +304,38 @@ class GameScene():
         return center_x, center_y
     
     def draw_pot_chips(self, pots: list[Pot]):
+        if not pots:
+            return
+        
         width_of_chip = self.chip_500.get_width() * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
         stack_spacing = 35 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
+        pot_stack_gap = 2 * stack_spacing  # gap between separate pot stacks
+        
         table_center_x = self.play_x + self.play_w / 2
         pot_y = self.play_y + self.play_h / 2 + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER * 0.55
-        
+
+        # Width of each pot block
+        block_widths = []
         for pot in pots:
             denominations = calculate_chip_denominations(pot.amount)
             num_stacks = len(denominations)
             
-            # Center the chip row on the table: first stack so that layout center = table center
-            first_stack_x = table_center_x - (num_stacks - 1) * stack_spacing / 2 - width_of_chip / 2
+            block_width = (num_stacks - 1) * stack_spacing + width_of_chip if num_stacks else width_of_chip
+            
+            block_widths.append(block_width)
+
+        total_width = sum(block_widths) + (len(pots) - 1) * pot_stack_gap
+        left_edge = table_center_x - total_width / 2
+
+        for pot_index, pot in enumerate(pots):
+            denominations = calculate_chip_denominations(pot.amount)
+            num_stacks = len(denominations)
+            
+            if num_stacks == 0:
+                continue
+            
+            block_start = left_edge + sum(block_widths[:pot_index]) + pot_index * pot_stack_gap
+            first_stack_x = block_start
             
             for i, (denomination, count) in enumerate(denominations.items()):
                 for j in range(count):

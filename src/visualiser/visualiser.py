@@ -21,7 +21,7 @@ class Visualiser():
             button_position=0,
             community_cards=["Kh", "9d", "Ac"],
             total_pot=3292,
-            pots=[Pot(amount=3292, eligible_players=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])],
+            pots=[Pot(amount=3292, eligible_players=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), Pot(amount=671, eligible_players=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), Pot(amount=329, eligible_players=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])],
             blinds=(10, 20),
             blinds_schedule={},
             minimum_raise_amount=0,
