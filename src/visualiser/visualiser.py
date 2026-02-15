@@ -2,7 +2,7 @@ import pygame
 import sys
 from src.visualiser.scene import GameScene
 from src.core.gamestate import PublicGamestate
-from src.core.data_classes import PlayerPublicInfo
+from src.core.data_classes import PlayerPublicInfo, Pot
 
 FPS = 60
 
@@ -20,8 +20,8 @@ class Visualiser():
             player_public_infos=[PlayerPublicInfo(active=True, stack=1000, current_bet=0, busted=False, is_all_in=False) for _ in range(10)],
             button_position=0,
             community_cards=["Kh", "9d", "Ac"],
-            total_pot=0,
-            pots=[],
+            total_pot=750,
+            pots=[Pot(amount=3292, eligible_players=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])],
             blinds=(10, 20),
             blinds_schedule={},
             minimum_raise_amount=0,

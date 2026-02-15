@@ -2,7 +2,10 @@ import pygame
 import math
 import numpy as np
 import random
+
 from src.core.gamestate import PublicGamestate
+from src.visualiser.visual_util import calculate_chip_denominations
+from src.core.data_classes import Pot
 
 # Following the AAP-64 colour palette: https://lospec.com/palette-list/aap-64
 
@@ -14,6 +17,7 @@ CHECKERBOARD_SQUARES_HORIZONTAL = 40
 REFERENCE_SQUARE_SIZE = REFERENCE_WIDTH / CHECKERBOARD_SQUARES_HORIZONTAL
 # Multiplier for card size relative to the scaled size (2 = twice as big)
 CARD_SIZE_MULTIPLIER = 2
+CHIP_SIZE_MULTIPLIER = 1.5
 
 COLOURS = {
     "table_mat": (26, 122, 62),
@@ -56,6 +60,13 @@ class GameScene():
         self.font_size_small = 25
         self.font = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size)
         self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size_small)
+        
+        self.chip_500 = pygame.image.load("assets/textures/chips/chip_500.png")
+        self.chip_100 = pygame.image.load("assets/textures/chips/chip_100.png")
+        self.chip_50 = pygame.image.load("assets/textures/chips/chip_50.png")
+        self.chip_25 = pygame.image.load("assets/textures/chips/chip_25.png")
+        self.chip_5 = pygame.image.load("assets/textures/chips/chip_5.png")
+        self.chip_1 = pygame.image.load("assets/textures/chips/chip_1.png")
 
     def handle_events(self, events: list[pygame.event.Event]):
         for event in events:
@@ -82,6 +93,7 @@ class GameScene():
         self.draw_background()
         self.draw_table()
         self.draw_table_cards()
+        self.draw_pot_chips(self.gamestate.pots)
         self.draw_button()
         self.draw_ui()
 
@@ -93,9 +105,9 @@ class GameScene():
         w = self.screen.get_width()
         h = self.screen.get_height()
         
-        # Table size ~60% of screen, centered
-        table_w = int(w * 0.6)
-        table_h = int(h * 0.6)
+        # Table size ~75% of screen, centered
+        table_w = int(w * 0.75)
+        table_h = int(h * 0.75)
         table_x = (w - table_w) // 2
         table_y = (h - table_h) // 2
         
@@ -290,8 +302,40 @@ class GameScene():
             center_y = self.play_y + self.play_h / 2
             
         return center_x, center_y
-
+    
+    def draw_pot_chips(self, pots: list[Pot]):
+        width_of_chip = self.chip_500.get_width() * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
+        pot_x = self.play_x + self.play_w / 2 - 3 * width_of_chip
+        pot_y = self.play_y + self.play_h / 2 + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER * 2 / 3
         
+        for pot in pots:
+            denominations = calculate_chip_denominations(pot.amount)
+            
+            for i, (denomination, count) in enumerate(denominations.items()):
+                for j in range(count):
+                    self.draw_chip(denomination, int(pot_x + i * 35 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER), int(pot_y + j * 10 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER))
+                    
+    def draw_chip(self, denomination: int, x: int, y: int):
+        if denomination not in [500, 100, 50, 25, 5, 1]:
+            return
+        
+        if denomination == 500:
+            chip_image = self.chip_500
+        elif denomination == 100:
+            chip_image = self.chip_100
+        elif denomination == 50:
+            chip_image = self.chip_50
+        elif denomination == 25:
+            chip_image = self.chip_25
+        elif denomination == 5:
+            chip_image = self.chip_5
+        elif denomination == 1:
+            chip_image = self.chip_1
+            
+        chip_scale = self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
+        chip_scaled = pygame.transform.scale(chip_image, (int(chip_image.get_width() * chip_scale), int(chip_image.get_height() * chip_scale)))
+        
+        self.screen.blit(chip_scaled, (int(x), int(y)))
 
     def draw_ui(self):
         ui_length = 10
