@@ -2,6 +2,7 @@ import pygame
 import sys
 from src.visualiser.scene import GameScene
 from src.core.gamestate import PublicGamestate
+from src.core.data_classes import PlayerPublicInfo
 
 FPS = 60
 
@@ -16,7 +17,7 @@ class Visualiser():
     def run(self):
         gamestate: PublicGamestate = PublicGamestate(
             round_number=1,
-            player_public_infos=[],
+            player_public_infos=[PlayerPublicInfo(active=True, stack=1000, current_bet=0, busted=False, is_all_in=False) for _ in range(10)],
             button_position=0,
             community_cards=["Kh", "9d", "Ac"],
             total_pot=0,

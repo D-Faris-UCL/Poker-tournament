@@ -23,6 +23,8 @@ COLOURS = {
     "wood_highlight": (90, 78, 68),
     "wood_dark": (50, 43, 40),
     "button": (254, 243, 192),
+    "text": (255, 255, 255),
+    "button_text": (20, 16, 19),
 }
 
 
@@ -50,9 +52,10 @@ class GameScene():
         self.card_spacing = 10
         self.card_radius = 10
 
-        self.font_size = 14
+        self.font_size = 60
+        self.font_size_small = 25
         self.font = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size)
-        self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", max(11, self.font_size - 2))
+        self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size_small)
 
     def handle_events(self, events: list[pygame.event.Event]):
         for event in events:
@@ -70,6 +73,9 @@ class GameScene():
         # Enforce 16:9: use width as reference, derive height
         self.square_size = width / CHECKERBOARD_SQUARES_HORIZONTAL
         self.pixel_scale_factor = self.square_size / REFERENCE_SQUARE_SIZE
+        
+        self.font = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", int(self.font_size * self.pixel_scale_factor))
+        self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", int(self.font_size_small * self.pixel_scale_factor))
 
     def draw(self):
         self._update_scale()
@@ -130,7 +136,7 @@ class GameScene():
 
     
     def draw_table_cards(self): 
-        # Positions in reference space; scale to screen
+        # Draw community cards
         for i in range(5):
             x = self.community_card_x + i * (self.card_spacing + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER) + self.card_spacing / 2
             y = self.community_card_y + self.card_spacing / 2
@@ -139,7 +145,51 @@ class GameScene():
                 self.draw_card_face_up(self.gamestate.community_cards[i], x, y)
             else:
                 self.draw_card_face_down(x, y)
-        
+                
+        edge_offset = 10 * self.pixel_scale_factor
+                
+        # Draw player cards face down
+        for i in range(len(self.gamestate.player_public_infos)):
+            if self.gamestate.player_public_infos[i].active:
+                center_x, center_y = self.calculate_player_position(i)
+                
+                if i == 0:
+                    self.draw_card_face_down(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 -2,
+                                             center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER/2 + 1, 
+                                             rotated=True, 
+                                             small=True)
+                    
+                    self.draw_card_face_down(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 -2, 
+                                             center_y - 1, 
+                                             rotated=True, 
+                                             small=True)
+                elif i == 5:
+                    self.draw_card_face_down(center_x - edge_offset,
+                                             center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER/2 + 1, 
+                                             rotated=True, 
+                                             small=True)
+                    
+                    self.draw_card_face_down(center_x - edge_offset, 
+                                             center_y - 1, 
+                                             rotated=True, 
+                                             small=True)
+                elif i in range(1, 5):
+                    self.draw_card_face_down(center_x + 2,
+                                             center_y + edge_offset,
+                                             small=True)
+                    
+                    self.draw_card_face_down(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 -2,
+                                             center_y + edge_offset, 
+                                             small=True)
+                    
+                elif i in range(6, 10):
+                    self.draw_card_face_down(center_x + 2,
+                                             center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 + 2,
+                                             small=True)
+                    
+                    self.draw_card_face_down(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 -2,
+                                             center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 + 2,
+                                             small=True)
     
     def draw_card_face_up(self, card:str, x:int, y:int):
         rank, suit = card[0], card[1]
@@ -177,43 +227,84 @@ class GameScene():
             
         self.screen.blit(card_scaled, (x, y))
         
-    def draw_card_face_down(self, x:int, y:int):
+    def draw_card_face_down(self, x:int, y:int, rotated:bool=False, small:bool=False):
         card = self.card_kernel.subsurface((0, 2 * self.card_kernel_y, self.card_kernel_x, self.card_kernel_y))
         card_scale = self.pixel_scale_factor * CARD_SIZE_MULTIPLIER
+        
+        if small:
+            card_scale = card_scale * 0.75
+            
         card_scaled = pygame.transform.scale(card,(int(self.card_kernel_x * card_scale), int(self.card_kernel_y * card_scale)))
         
+        
+        if rotated:
+            card_scaled = pygame.transform.rotate(card_scaled, 90)
+            x = x - card_scaled.get_width()
+            y = y - card_scaled.get_height()
+            
         self.screen.blit(card_scaled, (x, y))
         
     def draw_button(self):
-        # table has max 10 players with 1 at each end and 4 each long side
+        
         button = self.gamestate.button_position
         button_radius = 20 * self.pixel_scale_factor
 
         play_offset = 50 * self.pixel_scale_factor
-        spacing = self.play_w / 5
-
+        
+        center_x, center_y = self.calculate_player_position(button)
+        
         if button == 0:
-            center_x = self.play_x + play_offset
-            center_y = self.play_y + self.play_h / 2
+            center_x = center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + play_offset
         elif button == 5:
-            center_x = self.play_x + self.play_w - play_offset
-            center_y = self.play_y + self.play_h / 2
+            center_x = center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER - play_offset
         elif button in range(1, 5):
-            center_x = self.play_x + spacing * button + play_offset
-            center_y = self.play_y + play_offset
+            center_y = center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER
         elif button in range(6, 10):
-            center_x = self.play_x + self.play_w - spacing * (button - 5) - play_offset
-            center_y = self.play_y + self.play_h - play_offset
+            center_y = center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER
+
+
+        pygame.draw.circle(self.screen, COLOURS["button"], (int(center_x), int(center_y)), button_radius)
+        
+        #draw button text
+        button_text = self.font_small.render(f"BTN", True, COLOURS["button_text"])
+        self.screen.blit(button_text, (int(center_x - button_text.get_width() / 2), int(center_y - button_text.get_height() / 2)))
+        
+    def calculate_player_position(self, player_index: int):
+        """table has max 10 players with 1 at each end and 4 each long side"""
+        spacing = self.play_w / 5
+        
+        if player_index == 0:
+            center_x = self.play_x
+            center_y = self.play_y + self.play_h / 2
+        elif player_index == 5:
+            center_x = self.play_x + self.play_w
+            center_y = self.play_y + self.play_h / 2
+        elif player_index in range(1, 5):
+            center_x = self.play_x + spacing * player_index
+            center_y = self.play_y
+        elif player_index in range(6, 10):
+            center_x = self.play_x + self.play_w - spacing * (player_index - 5)
+            center_y = self.play_y + self.play_h
         else:
             center_x = self.play_x + self.play_w / 2
             center_y = self.play_y + self.play_h / 2
-
-        pygame.draw.circle(self.screen, COLOURS["button"], (int(center_x), int(center_y)), button_radius)
+            
+        return center_x, center_y
 
         
 
     def draw_ui(self):
-        pass
+        ui_length = 10
+        
+        #draw current round
+        round_text = self.font.render(f"Round: {self.gamestate.round_number}", True, COLOURS["text"])
+        self.screen.blit(round_text, (ui_length, 10))
+        
+        ui_length += round_text.get_width() + 20
+        
+        #draw total pot size
+        total_pot_text = self.font.render(f"Total Pot: {self.gamestate.total_pot}", True, COLOURS["text"])
+        self.screen.blit(total_pot_text, (ui_length, 10))
 
     def draw_hover_effects(self, mouse_x: int, mouse_y: int):
         pass
