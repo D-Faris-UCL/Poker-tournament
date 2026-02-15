@@ -20,7 +20,7 @@ class Visualiser():
             player_public_infos=[PlayerPublicInfo(active=True, stack=1000, current_bet=0, busted=False, is_all_in=False) for _ in range(10)],
             button_position=0,
             community_cards=["Kh", "9d", "Ac"],
-            total_pot=750,
+            total_pot=3292,
             pots=[Pot(amount=3292, eligible_players=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])],
             blinds=(10, 20),
             blinds_schedule={},

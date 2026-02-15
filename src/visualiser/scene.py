@@ -305,15 +305,20 @@ class GameScene():
     
     def draw_pot_chips(self, pots: list[Pot]):
         width_of_chip = self.chip_500.get_width() * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
-        pot_x = self.play_x + self.play_w / 2 - 3 * width_of_chip
-        pot_y = self.play_y + self.play_h / 2 + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER * 2 / 3
+        stack_spacing = 35 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
+        table_center_x = self.play_x + self.play_w / 2
+        pot_y = self.play_y + self.play_h / 2 + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER * 0.55
         
         for pot in pots:
             denominations = calculate_chip_denominations(pot.amount)
+            num_stacks = len(denominations)
+            
+            # Center the chip row on the table: first stack so that layout center = table center
+            first_stack_x = table_center_x - (num_stacks - 1) * stack_spacing / 2 - width_of_chip / 2
             
             for i, (denomination, count) in enumerate(denominations.items()):
                 for j in range(count):
-                    self.draw_chip(denomination, int(pot_x + i * 35 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER), int(pot_y + j * 10 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER))
+                    self.draw_chip(denomination, int(first_stack_x + i * stack_spacing), int(pot_y + j * 10 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER))
                     
     def draw_chip(self, denomination: int, x: int, y: int):
         if denomination not in [500, 100, 50, 25, 5, 1]:
