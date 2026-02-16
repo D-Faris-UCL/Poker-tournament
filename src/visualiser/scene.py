@@ -187,53 +187,53 @@ class GameScene():
                 self.draw_card_face_down(x, y)
                 
         edge_offset = 10 * self.pixel_scale_factor
-                
-        # Draw player cards face down
-        for i in range(len(self.gamestate.player_public_infos)):
-            if self.gamestate.player_public_infos[i].active:
-                center_x, center_y = self.calculate_player_position(i)
-                
-                if i == 0:
-                    self.draw_card_face_down(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 -2,
-                                             center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER/2 + 1, 
-                                             rotated=True, 
-                                             small=True)
-                    
-                    self.draw_card_face_down(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 -2, 
-                                             center_y - 1, 
-                                             rotated=True, 
-                                             small=True)
-                elif i == 5:
-                    self.draw_card_face_down(center_x - edge_offset,
-                                             center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER/2 + 1, 
-                                             rotated=True, 
-                                             small=True)
-                    
-                    self.draw_card_face_down(center_x - edge_offset, 
-                                             center_y - 1, 
-                                             rotated=True, 
-                                             small=True)
-                elif i in range(1, 5):
-                    self.draw_card_face_down(center_x + 2,
-                                             center_y + edge_offset,
-                                             small=True)
-                    
-                    self.draw_card_face_down(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 -2,
-                                             center_y + edge_offset, 
-                                             small=True)
-                    
-                elif i in range(6, 10):
-                    self.draw_card_face_down(center_x + 2,
-                                             center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 + 2,
-                                             small=True)
-                    
-                    self.draw_card_face_down(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 -2,
-                                             center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 + 2,
-                                             small=True)
+        revealed = getattr(self.gamestate, "last_hand_revealed_cards", None)
+
+        # Draw player cards: face up at showdown when revealed, else face down for active
+        players_to_draw = list(revealed.keys()) if revealed else [
+            i for i in range(len(self.gamestate.player_public_infos))
+            if self.gamestate.player_public_infos[i].active
+        ]
+
+        for i in players_to_draw:
+            center_x, center_y = self.calculate_player_position(i)
+            cards = revealed.get(i) if revealed else None
+            draw_face_up = cards is not None
+
+            def draw_card1(x, y, rot=False):
+                if draw_face_up and cards:
+                    self.draw_card_face_up(cards[0], x, y, rotated=rot, small=True)
+                else:
+                    self.draw_card_face_down(x, y, rotated=rot, small=True)
+
+            def draw_card2(x, y, rot=False):
+                if draw_face_up and cards and len(cards) > 1:
+                    self.draw_card_face_up(cards[1], x, y, rotated=rot, small=True)
+                else:
+                    self.draw_card_face_down(x, y, rotated=rot, small=True)
+
+            if i == 0:
+                draw_card1(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 - 2,
+                           center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER / 2 + 1, rot=True)
+                draw_card2(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 - 2,
+                           center_y - 1, rot=True)
+            elif i == 5:
+                draw_card1(center_x - edge_offset,
+                           center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER / 2 + 1, rot=True)
+                draw_card2(center_x - edge_offset, center_y - 1, rot=True)
+            elif i in range(1, 5):
+                draw_card1(center_x + 2, center_y + edge_offset)
+                draw_card2(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 - 2,
+                           center_y + edge_offset)
+            elif i in range(6, 10):
+                draw_card1(center_x + 2,
+                           center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 + 2)
+                draw_card2(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 - 2,
+                           center_y - self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 + 2)
     
-    def draw_card_face_up(self, card:str, x:int, y:int):
+    def draw_card_face_up(self, card: str, x: int, y: int, rotated: bool = False, small: bool = False):
         rank, suit = card[0], card[1]
-        
+
         if rank.isnumeric():
             i = self.card_kernel_x * int(rank)
         elif rank == "A":
@@ -248,7 +248,7 @@ class GameScene():
             i = self.card_kernel_x * 10
         else:
             i = 0
-        
+
         if suit == "h":
             j = 0
         elif suit == "s":
@@ -257,14 +257,18 @@ class GameScene():
             j = self.card_kernel_y * 2
         elif suit == "c":
             j = self.card_kernel_y * 3
-            
-        #get single card image from card kernel
+
         card_image = self.card_kernel.subsurface((i, j, self.card_kernel_x, self.card_kernel_y))
-        
-        #scale card image to pixel scale factor
         card_scale = self.pixel_scale_factor * CARD_SIZE_MULTIPLIER
+        if small:
+            card_scale = card_scale * 0.75
         card_scaled = pygame.transform.scale(card_image, (int(self.card_kernel_x * card_scale), int(self.card_kernel_y * card_scale)))
-            
+
+        if rotated:
+            card_scaled = pygame.transform.rotate(card_scaled, 90)
+            x = x - card_scaled.get_width()
+            y = y - card_scaled.get_height()
+
         self.screen.blit(card_scaled, (x, y))
         
     def draw_card_face_down(self, x:int, y:int, rotated:bool=False, small:bool=False):
@@ -285,7 +289,6 @@ class GameScene():
         self.screen.blit(card_scaled, (x, y))
         
     def draw_button(self):
-        
         button = self.gamestate.button_position
         button_radius = 20 * self.pixel_scale_factor
 

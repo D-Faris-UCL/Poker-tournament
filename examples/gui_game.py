@@ -16,11 +16,11 @@ from src.visualiser.visualiser import Visualiser
 MAX_HANDS = 150
 
 # Delay bounds seconds for each action type
-DELAY_CHECK = 1
-DELAY_FOLD = 0.4
-DELAY_CALL = 0.7
-DELAY_MAX = 3
-DELAY_END = 2
+DELAY_CHECK = 0.7
+DELAY_FOLD = 0.7
+DELAY_CALL = 1.2
+DELAY_MAX = 3.5
+DELAY_END = 5
 
 
 def action_delay(action_type: str, amount: int) -> float:
@@ -48,10 +48,21 @@ def run_game_thread(table: Table, latest_gamestate: list) -> None:
     for _ in range(1, MAX_HANDS + 1):
         if table.get_public_gamestate().get_non_busted_players_count() <= 1:
             break
+        
         result = table.simulate_hand()
-        gs = table.get_public_gamestate()
-        gs.last_hand_winners = {idx: amount for idx, (_, amount) in result["winners"].items()}
-        latest_gamestate[0] = gs
+        gamestate = table.get_public_gamestate()
+        gamestate.last_hand_winners = {idx: amount for idx, (_, amount) in result["winners"].items()}
+        
+        if result.get("showdown"):
+            gamestate.last_hand_revealed_cards = {
+                i: table.player_hole_cards[i]
+                for i in range(len(table.players))
+                if table.player_hole_cards[i] is not None and table.player_public_infos[i].active
+            }
+        else:
+            gamestate.last_hand_revealed_cards = None
+            
+        latest_gamestate[0] = gamestate
         time.sleep(DELAY_END)
 
 
