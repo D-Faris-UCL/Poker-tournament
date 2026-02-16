@@ -56,7 +56,7 @@ class GameScene():
         self.card_spacing = 10
         self.card_radius = 10
 
-        self.font_size = 60
+        self.font_size = 50
         self.font_size_small = 25
         self.font = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size)
         self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", self.font_size_small)
@@ -376,27 +376,48 @@ class GameScene():
         total_pot_text = self.font.render(f"Total Pot: {self.gamestate.total_pot}", True, COLOURS["text"])
         self.screen.blit(total_pot_text, (ui_length, 10))
         
-        #draw player stack sizes
+        #draw player ui
         for i in range(len(self.gamestate.player_public_infos)):
             if self.gamestate.player_public_infos[i].active:
                 center_x, center_y = self.calculate_player_position(i)
+                line_spacing = 2 * self.pixel_scale_factor
                 
-                stack_size = f"Player {i} Stack: {self.gamestate.player_public_infos[i].stack}"
+                #player name
+                name = f"Player {i}:"
+                name_text = self.font_small.render(f"{name}", True, COLOURS["text"])
+                
+                #player current bet
+                current_bet = f"Current Bet - {self.gamestate.player_public_infos[i].current_bet}"
+                current_bet_text = self.font_small.render(f"{current_bet}", True, COLOURS["text"])
+                
+                #player stack size
+                stack_size = f"Stack - {self.gamestate.player_public_infos[i].stack}"
                 stack_text = self.font_small.render(f"{stack_size}", True, COLOURS["text"])
                 
-                if i == 0:
-                    center_x = center_x - stack_text.get_width() / 2 - 15 * self.pixel_scale_factor
-                elif i == 5:
-                    center_x = center_x + stack_text.get_width() / 2 + 15 * self.pixel_scale_factor
-                elif i in range(1, 5):
-                    center_y = center_y - stack_text.get_height() - 3 * self.pixel_scale_factor
-                elif i in range(6, 10):
-                    center_y = center_y + stack_text.get_height() + 3 * self.pixel_scale_factor
-                else:
-                    center_x = center_x - stack_text.get_width() / 2
-                    center_y = center_y - stack_text.get_height() / 2
+                text_height = int(sum([name_text.get_height(), current_bet_text.get_height(), stack_text.get_height(), 2 * line_spacing]))
+                text_width = int(max(name_text.get_width(), current_bet_text.get_width(), stack_text.get_width()))
                 
-                self.screen.blit(stack_text, (center_x - stack_text.get_width() / 2, center_y - stack_text.get_height() / 2))
+                
+                if i == 0:
+                    center_x = center_x - text_width / 2 - 15 * self.pixel_scale_factor
+                elif i == 5:
+                    center_x = center_x + text_width / 2 + 15 * self.pixel_scale_factor
+                elif i in range(1, 5):
+                    center_y = center_y - text_height + 30 * self.pixel_scale_factor
+                elif i in range(6, 10):
+                    center_y = center_y + text_height - 30 * self.pixel_scale_factor
+                else:
+                    center_x = center_x - text_width / 2
+                    center_y = center_y - text_height / 2
+                    
+                top_x = center_x - text_width / 2
+                top_y = center_y - text_height / 2
+                    
+                self.screen.blit(name_text, (top_x, top_y))
+                
+                self.screen.blit(current_bet_text, (top_x, top_y + name_text.get_height() + line_spacing))
+                
+                self.screen.blit(stack_text, (top_x, top_y + name_text.get_height() + current_bet_text.get_height() + 2 * line_spacing))
 
     def draw_hover_effects(self, mouse_x: int, mouse_y: int):
         pass
