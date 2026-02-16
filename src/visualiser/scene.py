@@ -28,6 +28,7 @@ COLOURS = {
     "wood_dark": (50, 43, 40),
     "button": (254, 243, 192),
     "text": (255, 255, 255),
+    "current_player": (255, 215, 0),
     "button_text": (20, 16, 19),
 }
 
@@ -88,14 +89,28 @@ class GameScene():
         self.font = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", int(self.font_size * self.pixel_scale_factor))
         self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", int(self.font_size_small * self.pixel_scale_factor))
 
+    def _get_display_pot_state(self):
+        """Include current bets in pot display so chips update after each action."""
+        pending_bets = sum(info.current_bet for info in self.gamestate.player_public_infos)
+        display_total = self.gamestate.total_pot + pending_bets
+        
+        if not self.gamestate.pots:
+            display_pots = [Pot(pending_bets, [])] if pending_bets > 0 else []
+        else:
+            first = self.gamestate.pots[0]
+            display_pots = [Pot(first.amount + pending_bets, first.eligible_players)] + list(self.gamestate.pots[1:])
+            
+        return display_total, display_pots
+
     def draw(self):
         self._update_scale()
         self.draw_background()
         self.draw_table()
         self.draw_table_cards()
-        self.draw_pot_chips(self.gamestate.pots)
+        display_total, display_pots = self._get_display_pot_state()
+        self.draw_pot_chips(display_pots)
         self.draw_button()
-        self.draw_ui()
+        self.draw_ui(display_total)
 
     def draw_background(self):
         self.screen.fill(COLOURS["background_navy"])
@@ -363,36 +378,41 @@ class GameScene():
         
         self.screen.blit(chip_scaled, (int(x), int(y)))
 
-    def draw_ui(self):
+    def draw_ui(self, display_total_pot: int = None):
+        if display_total_pot is None:
+            display_total_pot = self.gamestate.total_pot + sum(info.current_bet for info in self.gamestate.player_public_infos)
         ui_length = 10
-        
+
         #draw current round
         round_text = self.font.render(f"Round: {self.gamestate.round_number}", True, COLOURS["text"])
         self.screen.blit(round_text, (ui_length, 10))
-        
+
         ui_length += round_text.get_width() + 20
-        
-        #draw total pot size
-        total_pot_text = self.font.render(f"Total Pot: {self.gamestate.total_pot}", True, COLOURS["text"])
+
+        #draw total pot size (includes current bets so it updates after each action)
+        total_pot_text = self.font.render(f"Total Pot: {display_total_pot}", True, COLOURS["text"])
         self.screen.blit(total_pot_text, (ui_length, 10))
         
         #draw player ui
+        current_player = getattr(self.gamestate, "current_player", None)
         for i in range(len(self.gamestate.player_public_infos)):
-            if self.gamestate.player_public_infos[i].active:
+            if not self.gamestate.player_public_infos[i].busted:
+                info = self.gamestate.player_public_infos[i]
                 center_x, center_y = self.calculate_player_position(i)
                 line_spacing = 2 * self.pixel_scale_factor
-                
-                #player name
-                name = f"Player {i}:"
-                name_text = self.font_small.render(f"{name}", True, COLOURS["text"])
-                
+                player_colour = COLOURS["current_player"] if current_player is not None and i == current_player else COLOURS["text"]
+
+                #player name (show "Folded" for players who folded this hand)
+                name = f"Player {i}:" + (" (Folded)" if not info.active else "")
+                name_text = self.font_small.render(f"{name}", True, player_colour)
+
                 #player current bet
-                current_bet = f"Current Bet - {self.gamestate.player_public_infos[i].current_bet}"
-                current_bet_text = self.font_small.render(f"{current_bet}", True, COLOURS["text"])
-                
+                current_bet = f"Current Bet - {info.current_bet}"
+                current_bet_text = self.font_small.render(f"{current_bet}", True, player_colour)
+
                 #player stack size
-                stack_size = f"Stack - {self.gamestate.player_public_infos[i].stack}"
-                stack_text = self.font_small.render(f"{stack_size}", True, COLOURS["text"])
+                stack_size = f"Stack - {info.stack}"
+                stack_text = self.font_small.render(f"{stack_size}", True, player_colour)
                 
                 text_height = int(sum([name_text.get_height(), current_bet_text.get_height(), stack_text.get_height(), 2 * line_spacing]))
                 text_width = int(max(name_text.get_width(), current_bet_text.get_width(), stack_text.get_width()))

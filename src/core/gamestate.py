@@ -1,6 +1,6 @@
 """Public game state visible to all players"""
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from copy import deepcopy
 from .data_classes import PlayerPublicInfo, Pot, Action
 
@@ -24,6 +24,7 @@ class PublicGamestate:
         minimum_raise_amount: Minimum valid raise amount
         current_hand_history: Actions taken in current hand by street
         previous_hand_histories: History from previous hands
+        current_player: Index of player whose turn it is (optional, for display)
     """
 
     def __init__(
@@ -38,7 +39,8 @@ class PublicGamestate:
         blinds_schedule: Dict[int, Tuple[int, int]],
         minimum_raise_amount: int,
         current_hand_history: Dict[str, List[Action]],
-        previous_hand_histories: List[Dict[str, List[Action]]]
+        previous_hand_histories: List[Dict[str, List[Action]]],
+        current_player: Optional[int] = None,
     ):
         """Initialize public gamestate
 
@@ -54,6 +56,7 @@ class PublicGamestate:
             minimum_raise_amount: Minimum raise amount
             current_hand_history: Current hand history by street
             previous_hand_histories: Previous hands' histories
+            current_player: Index of player whose turn it is (optional).
         """
         self.round_number = round_number
         self.player_public_infos = player_public_infos
@@ -66,6 +69,7 @@ class PublicGamestate:
         self.minimum_raise_amount = minimum_raise_amount
         self.current_hand_history = current_hand_history
         self.previous_hand_histories = previous_hand_histories
+        self.current_player = current_player
 
     def get_active_players_count(self) -> int:
         """Count number of active players in current hand
@@ -126,7 +130,8 @@ class PublicGamestate:
             blinds_schedule=self.blinds_schedule.copy(),
             minimum_raise_amount=self.minimum_raise_amount,
             current_hand_history=deepcopy(self.current_hand_history),
-            previous_hand_histories=deepcopy(self.previous_hand_histories)
+            previous_hand_histories=deepcopy(self.previous_hand_histories),
+            current_player=self.current_player,
         )
 
     def __repr__(self) -> str:

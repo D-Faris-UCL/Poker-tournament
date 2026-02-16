@@ -1,5 +1,6 @@
 import pygame
 import sys
+from typing import Callable
 from src.visualiser.scene import GameScene
 from src.core.gamestate import PublicGamestate
 from src.core.data_classes import PlayerPublicInfo, Pot
@@ -13,6 +14,26 @@ class Visualiser():
         self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
         self.scene = GameScene(self.screen)
         self.clock = pygame.time.Clock()
+
+    def run_with_gamestate(self, get_gamestate: Callable[[], PublicGamestate]) -> None:
+        """Run the pygame loop, calling get_gamestate() each frame and passing result to the scene."""
+        while True:
+            events = pygame.event.get()
+            for event in events:
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+                if event.type == pygame.VIDEORESIZE:
+                    self.screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+                    self.scene.screen = self.screen
+
+            gamestate = get_gamestate()
+            self.scene.update(gamestate)
+            self.scene.handle_events(events)
+            self.scene.draw()
+            pygame.display.flip()
+            self.clock.tick(FPS)
 
     def run(self):
         gamestate: PublicGamestate = PublicGamestate(
