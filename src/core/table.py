@@ -253,8 +253,13 @@ class Table:
         if street != "preflop":
             for info in self.player_public_infos:
                 info.current_bet = 0
-            # Start action after button
-            self.current_player = self.get_next_player_index(self.button_position)
+            # Start action after button - use get_next_actor so we skip folded players
+            # (get_next_player_index only skips busted; first_actor must be active for break condition)
+            self.current_player = PlayerJudge.get_next_actor(
+                self.button_position,
+                self.player_public_infos,
+                len(self.players)
+            )
 
         # Track the last player to bet/raise (aggressor)
         last_aggressor_idx = -1
