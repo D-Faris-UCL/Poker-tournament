@@ -16,8 +16,11 @@ from src.visualiser.visualiser import Visualiser
 MAX_HANDS = 150
 
 # Delay bounds seconds for each action type
-DELAY_CHECK = 1.5
-DELAY_MAX = 5
+DELAY_CHECK = 1
+DELAY_FOLD = 0.4
+DELAY_CALL = 0.7
+DELAY_MAX = 3
+DELAY_END = 2
 
 
 def action_delay(action_type: str, amount: int) -> float:
@@ -25,11 +28,11 @@ def action_delay(action_type: str, amount: int) -> float:
     if action_type == "check":
         return DELAY_CHECK
     if action_type == "fold":
-        return 0.35
+        return DELAY_FOLD
     if action_type in ("small_blind", "big_blind"):
         return 0.25 if action_type == "small_blind" else 0.3
     if action_type == "call":
-        return 0.4
+        return DELAY_CALL
     if action_type == "all-in":
         return DELAY_MAX
     # bet / raise: scale with amount, between 0.45 and 0.9
@@ -45,8 +48,11 @@ def run_game_thread(table: Table, latest_gamestate: list) -> None:
     for _ in range(1, MAX_HANDS + 1):
         if table.get_public_gamestate().get_non_busted_players_count() <= 1:
             break
-        table.simulate_hand()
-        latest_gamestate[0] = table.get_public_gamestate()
+        result = table.simulate_hand()
+        gs = table.get_public_gamestate()
+        gs.last_hand_winners = {idx: amount for idx, (_, amount) in result["winners"].items()}
+        latest_gamestate[0] = gs
+        time.sleep(DELAY_END)
 
 
 def main() -> None:

@@ -90,24 +90,37 @@ class GameScene():
         self.font_small = pygame.font.Font("assets/fonts/Jersey_10/Jersey10-Regular.ttf", int(self.font_size_small * self.pixel_scale_factor))
 
     def _get_display_pot_state(self):
-        """Include current bets in pot display so chips update after each action."""
+        """Return display_total, display_pots, and has_pending_bets.
+        When has_pending_bets: center pot = reconciled only; draw player bet chips at seats.
+        When not: center pot = full amount; no player chips."""
         pending_bets = sum(info.current_bet for info in self.gamestate.player_public_infos)
         display_total = self.gamestate.total_pot + pending_bets
-        
-        if not self.gamestate.pots:
-            display_pots = [Pot(pending_bets, [])] if pending_bets > 0 else []
+        has_pending_bets = pending_bets > 0
+
+        if has_pending_bets:
+            # Reconciled pots only; player chips drawn separately
+            display_pots = list(self.gamestate.pots)
         else:
-            first = self.gamestate.pots[0]
-            display_pots = [Pot(first.amount + pending_bets, first.eligible_players)] + list(self.gamestate.pots[1:])
-            
-        return display_total, display_pots
+            # Full pot in center
+            if not self.gamestate.pots:
+                display_pots = []
+            else:
+                display_pots = list(self.gamestate.pots)
+
+        return display_total, display_pots, has_pending_bets
 
     def draw(self):
         self._update_scale()
         self.draw_background()
         self.draw_table()
         self.draw_table_cards()
-        display_total, display_pots = self._get_display_pot_state()
+        
+        display_total, display_pots, has_pending_bets = self._get_display_pot_state()
+        if has_pending_bets:
+            self.draw_player_bet_chips()
+        else:
+            self._draw_winner_chips_if_any()
+
         self.draw_pot_chips(display_pots)
         self.draw_button()
         self.draw_ui(display_total)
@@ -355,11 +368,110 @@ class GameScene():
             for i, (denomination, count) in enumerate(denominations.items()):
                 for j in range(count):
                     self.draw_chip(denomination, int(first_stack_x + i * stack_spacing), int(pot_y + j * 10 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER))
-                    
-    def draw_chip(self, denomination: int, x: int, y: int):
+
+    def draw_player_bet_chips(self):
+        """Draw each player's current bet as chips inward from their cards (0.75 scale)."""
+        bet_scale = 0.75
+        width_of_chip = self.chip_500.get_width() * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * bet_scale
+        stack_spacing = 35 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * bet_scale
+        chip_stack_offset = 10 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * bet_scale
+        edge_offset = 15 * self.pixel_scale_factor
+
+        # Small card dimensions: rotated for 0/5 (horizontal extent = kernel_y), normal for 1-4/6-9 (height = kernel_y)
+        small_card_inward = self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER * 0.75
+
+        for i, info in enumerate(self.gamestate.player_public_infos):
+            if info.busted or info.current_bet == 0:
+                continue
+
+            denominations = calculate_chip_denominations(info.current_bet)
+            if not denominations:
+                continue
+
+            num_stacks = len(denominations)
+            max_count = max(denominations.values())
+            stack_width = (num_stacks - 1) * stack_spacing + width_of_chip if num_stacks else width_of_chip
+            stack_height = max_count * chip_stack_offset
+
+            center_x, center_y = self.calculate_player_position(i)
+
+            if i == 0:
+                bet_x = center_x + small_card_inward + edge_offset
+                bet_y = center_y - stack_height / 2
+            elif i == 5:
+                bet_x = center_x - small_card_inward - stack_width - edge_offset
+                bet_y = center_y - stack_height / 2
+            elif i in range(1, 5):
+                bet_x = center_x - stack_width / 2
+                bet_y = center_y + small_card_inward + edge_offset
+            elif i in range(6, 10):
+                bet_x = center_x - stack_width / 2
+                bet_y = center_y - small_card_inward - stack_height - edge_offset
+            else:
+                bet_x = center_x - stack_width / 2
+                bet_y = center_y - stack_height / 2
+
+            for col, (denomination, count) in enumerate(denominations.items()):
+                for row in range(count):
+                    x = int(bet_x + col * stack_spacing)
+                    y = int(bet_y + row * chip_stack_offset)
+                    self.draw_chip(denomination, x, y, scale_factor=bet_scale)
+
+    def _draw_winner_chips_if_any(self):
+        """At end of hand, draw each winner's chips near their position to show who won."""
+        winners = getattr(self.gamestate, "last_hand_winners", None)
+        
+        if not winners:
+            return
+
+        bet_scale = 0.75
+        width_of_chip = self.chip_500.get_width() * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * bet_scale
+        stack_spacing = 35 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * bet_scale
+        chip_stack_offset = 10 * self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * bet_scale
+        edge_offset = 15 * self.pixel_scale_factor
+        small_card_inward = self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER * 0.75
+
+        for i, amount in winners.items():
+            if amount <= 0 or (i < len(self.gamestate.player_public_infos) and self.gamestate.player_public_infos[i].busted):
+                continue
+
+            denominations = calculate_chip_denominations(amount)
+            if not denominations:
+                continue
+
+            num_stacks = len(denominations)
+            max_count = max(denominations.values())
+            stack_width = (num_stacks - 1) * stack_spacing + width_of_chip if num_stacks else width_of_chip
+            stack_height = max_count * chip_stack_offset
+
+            center_x, center_y = self.calculate_player_position(i)
+
+            if i == 0:
+                bet_x = center_x + small_card_inward + edge_offset
+                bet_y = center_y - stack_height / 2
+            elif i == 5:
+                bet_x = center_x - small_card_inward - stack_width - edge_offset
+                bet_y = center_y - stack_height / 2
+            elif i in range(1, 5):
+                bet_x = center_x - stack_width / 2
+                bet_y = center_y + small_card_inward + edge_offset
+            elif i in range(6, 10):
+                bet_x = center_x - stack_width / 2
+                bet_y = center_y - small_card_inward - stack_height - edge_offset
+            else:
+                bet_x = center_x - stack_width / 2
+                bet_y = center_y - stack_height / 2
+
+            for col, (denomination, count) in enumerate(denominations.items()):
+                for row in range(count):
+                    x = int(bet_x + col * stack_spacing)
+                    y = int(bet_y + row * chip_stack_offset)
+                    self.draw_chip(denomination, x, y, scale_factor=bet_scale)
+
+    def draw_chip(self, denomination: int, x: int, y: int, scale_factor: float = 1.0):
         if denomination not in [500, 100, 50, 25, 5, 1]:
             return
-        
+
         if denomination == 500:
             chip_image = self.chip_500
         elif denomination == 100:
@@ -372,10 +484,10 @@ class GameScene():
             chip_image = self.chip_5
         elif denomination == 1:
             chip_image = self.chip_1
-            
-        chip_scale = self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER
+
+        chip_scale = self.pixel_scale_factor * CHIP_SIZE_MULTIPLIER * scale_factor
         chip_scaled = pygame.transform.scale(chip_image, (int(chip_image.get_width() * chip_scale), int(chip_image.get_height() * chip_scale)))
-        
+
         self.screen.blit(chip_scaled, (int(x), int(y)))
 
     def draw_ui(self, display_total_pot: int = None):
