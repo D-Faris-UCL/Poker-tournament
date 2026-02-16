@@ -375,6 +375,28 @@ class GameScene():
         #draw total pot size
         total_pot_text = self.font.render(f"Total Pot: {self.gamestate.total_pot}", True, COLOURS["text"])
         self.screen.blit(total_pot_text, (ui_length, 10))
+        
+        #draw player stack sizes
+        for i in range(len(self.gamestate.player_public_infos)):
+            if self.gamestate.player_public_infos[i].active:
+                center_x, center_y = self.calculate_player_position(i)
+                
+                stack_size = f"Player {i} Stack: {self.gamestate.player_public_infos[i].stack}"
+                stack_text = self.font_small.render(f"{stack_size}", True, COLOURS["text"])
+                
+                if i == 0:
+                    center_x = center_x - stack_text.get_width() / 2 - 15 * self.pixel_scale_factor
+                elif i == 5:
+                    center_x = center_x + stack_text.get_width() / 2 + 15 * self.pixel_scale_factor
+                elif i in range(1, 5):
+                    center_y = center_y - stack_text.get_height() - 3 * self.pixel_scale_factor
+                elif i in range(6, 10):
+                    center_y = center_y + stack_text.get_height() + 3 * self.pixel_scale_factor
+                else:
+                    center_x = center_x - stack_text.get_width() / 2
+                    center_y = center_y - stack_text.get_height() / 2
+                
+                self.screen.blit(stack_text, (center_x - stack_text.get_width() / 2, center_y - stack_text.get_height() / 2))
 
     def draw_hover_effects(self, mouse_x: int, mouse_y: int):
         pass
