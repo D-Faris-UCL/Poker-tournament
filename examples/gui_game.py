@@ -12,10 +12,15 @@ from src.core.table import Table
 from src.helpers.player_loader import get_player_by_name
 from src.visualiser.visualiser import Visualiser
 
+# Whether to expose cards at all times or only at showdown
+CARDS_EXPOSED = True
+
 # Number of hands to play (or until one player left)
 MAX_HANDS = 150
 
 # Delay bounds seconds for each action type
+DELAY_SMALL_BLIND = 0.5
+DELAY_BIG_BLIND = 0.5
 DELAY_CHECK = 0.7
 DELAY_FOLD = 0.7
 DELAY_CALL = 1.2
@@ -29,8 +34,10 @@ def action_delay(action_type: str, amount: int) -> float:
         return DELAY_CHECK
     if action_type == "fold":
         return DELAY_FOLD
-    if action_type in ("small_blind", "big_blind"):
-        return 0.25 if action_type == "small_blind" else 0.3
+    if action_type == "small_blind":
+        return DELAY_SMALL_BLIND
+    if action_type == "big_blind":
+        return DELAY_BIG_BLIND
     if action_type == "call":
         return DELAY_CALL
     if action_type == "all-in":
@@ -52,7 +59,10 @@ def run_game_thread(table: Table, latest_gamestate: list) -> None:
         result = table.simulate_hand()
         gamestate = table.get_public_gamestate()
         gamestate.last_hand_winners = {idx: amount for idx, (_, amount) in result["winners"].items()}
-        
+
+        if CARDS_EXPOSED:
+            gamestate.player_hole_cards = list(table.player_hole_cards)
+
         if result.get("showdown"):
             gamestate.last_hand_revealed_cards = {
                 i: table.player_hole_cards[i]
@@ -61,7 +71,7 @@ def run_game_thread(table: Table, latest_gamestate: list) -> None:
             }
         else:
             gamestate.last_hand_revealed_cards = None
-            
+
         latest_gamestate[0] = gamestate
         time.sleep(DELAY_END)
 
@@ -69,6 +79,7 @@ def run_game_thread(table: Table, latest_gamestate: list) -> None:
 def main() -> None:
     """Run a GUI poker game with 10 exploiter bots."""
     ExploiterBot = get_player_by_name("src/bots", "exploiter_bot")
+    
     if ExploiterBot is None:
         raise RuntimeError("exploiter_bot not found in src/bots")
 
@@ -76,32 +87,36 @@ def main() -> None:
 
     blinds_schedule = {
         1: (10, 20),
-        50: (20, 50),
+        50: (25, 50),
         100: (50, 100),
     }
 
     # Shared gamestate: use a list so the inner ref can be updated from the thread
-    table = Table(
-        players=bots,
-        starting_stack=2000,
-        blinds_schedule=blinds_schedule,
-    )
-    latest_gamestate = [table.get_public_gamestate()]
+    table = Table(players=bots, starting_stack=2000, blinds_schedule=blinds_schedule)
+    
+    gs = table.get_public_gamestate()
+    
+    if CARDS_EXPOSED:
+        gs.player_hole_cards = list(table.player_hole_cards)
+        
+    latest_gamestate = [gs]
 
     def after_action(action_type: str, amount: int) -> None:
-        latest_gamestate[0] = table.get_public_gamestate()
+        gs = table.get_public_gamestate()
+        
+        if CARDS_EXPOSED:
+            gs.player_hole_cards = list(table.player_hole_cards)
+            
+        latest_gamestate[0] = gs
+        
         time.sleep(action_delay(action_type, amount))
 
     table.on_after_action = after_action
 
-    game_thread = threading.Thread(
-        target=run_game_thread,
-        args=(table, latest_gamestate),
-        daemon=True,
-    )
+    game_thread = threading.Thread(target=run_game_thread, args=(table, latest_gamestate), daemon=True)
     game_thread.start()
 
-    visualiser = Visualiser()
+    visualiser = Visualiser(cards_exposed=CARDS_EXPOSED)
     visualiser.run_with_gamestate(lambda: latest_gamestate[0])
 
 

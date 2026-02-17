@@ -8,11 +8,11 @@ from src.core.data_classes import PlayerPublicInfo, Pot
 FPS = 60
 
 class Visualiser():
-    def __init__(self, width:int=1080, height:int=720, title:str="Poker Tournament"):
+    def __init__(self, width:int=1080, height:int=720, title:str="Poker Tournament", cards_exposed:bool=False):
         pygame.init()
         pygame.display.set_caption(title)
         self.screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
-        self.scene = GameScene(self.screen)
+        self.scene = GameScene(self.screen, cards_exposed=cards_exposed)
         self.clock = pygame.time.Clock()
 
     def run_with_gamestate(self, get_gamestate: Callable[[], PublicGamestate]) -> None:

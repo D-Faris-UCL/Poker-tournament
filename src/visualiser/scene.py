@@ -34,8 +34,10 @@ COLOURS = {
 
 
 class GameScene():
-    def __init__(self, screen: pygame.Surface):
+    def __init__(self, screen: pygame.Surface, cards_exposed:bool=False):
         self.screen = screen
+        self.cards_exposed = cards_exposed
+        
         self.gamestate: PublicGamestate = None
         self.mouse_x = 0
         self.mouse_y = 0
@@ -188,16 +190,33 @@ class GameScene():
                 
         edge_offset = 10 * self.pixel_scale_factor
         revealed = getattr(self.gamestate, "last_hand_revealed_cards", None)
+        hole_cards = getattr(self.gamestate, "player_hole_cards", None)
 
-        # Draw player cards: face up at showdown when revealed, else face down for active
-        players_to_draw = list(revealed.keys()) if revealed else [
-            i for i in range(len(self.gamestate.player_public_infos))
-            if self.gamestate.player_public_infos[i].active
-        ]
+        # Draw player cards face up when cards_exposed or at showdown, else face down for active and not busted
+        if self.cards_exposed and hole_cards:
+            players_to_draw = [
+                i for i in range(len(self.gamestate.player_public_infos))
+                if self.gamestate.player_public_infos[i].active
+                and not self.gamestate.player_public_infos[i].busted
+                and i < len(hole_cards)
+                and hole_cards[i] is not None
+            ]
+        elif revealed:
+            players_to_draw = list(revealed.keys())
+        else:
+            players_to_draw = [
+                i for i in range(len(self.gamestate.player_public_infos))
+                if self.gamestate.player_public_infos[i].active
+            ]
 
         for i in players_to_draw:
             center_x, center_y = self.calculate_player_position(i)
-            cards = revealed.get(i) if revealed else None
+            
+            if self.cards_exposed and hole_cards and i < len(hole_cards):
+                cards = hole_cards[i]
+            else:
+                cards = revealed.get(i) if revealed else None
+                
             draw_face_up = cards is not None
 
             def draw_card1(x, y, rot=False):
@@ -214,13 +233,13 @@ class GameScene():
 
             if i == 0:
                 draw_card1(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 - 2,
-                           center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER / 2 + 1, rot=True)
+                           center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER / 2 + 2 * self.pixel_scale_factor, rot=True)
                 draw_card2(center_x + self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 2 - 2,
-                           center_y - 1, rot=True)
+                           center_y - 2 * self.pixel_scale_factor, rot=True)
             elif i == 5:
                 draw_card1(center_x - edge_offset,
-                           center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER / 2 + 1, rot=True)
-                draw_card2(center_x - edge_offset, center_y - 1, rot=True)
+                           center_y + self.card_kernel_y * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER / 2 + 2 * self.pixel_scale_factor, rot=True)
+                draw_card2(center_x - edge_offset, center_y - 2 * self.pixel_scale_factor, rot=True)
             elif i in range(1, 5):
                 draw_card1(center_x + 2, center_y + edge_offset)
                 draw_card2(center_x - self.card_kernel_x * self.pixel_scale_factor * CARD_SIZE_MULTIPLIER + edge_offset * 3 - 2,
