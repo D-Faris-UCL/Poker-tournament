@@ -6,6 +6,7 @@ from .data_classes import PlayerPublicInfo, Pot, Action
 from .gamestate import PublicGamestate
 from .deck_manager import DeckManager
 from ..core.utils import timeout
+from ..core.utils.sandbox import SandboxedPlayer
 from ..helpers.player_judge import PlayerJudge
 from ..helpers.hand_judge import HandJudge
 
@@ -54,7 +55,10 @@ class Table:
             raise ValueError("Need at least 2 players")
 
         self.round_number = 1
-        self.players = players
+        self.players = [
+            SandboxedPlayer(player, max_ram_mb=500, time_limit=1.0)
+            for player in players
+        ]
         self.player_hole_cards: List[Optional[Tuple[str, str]]] = [None] * len(players)
         self.player_public_infos = [
             PlayerPublicInfo(
@@ -318,9 +322,9 @@ class Table:
             # Get action from player
             gamestate = self.get_public_gamestate()
             hole_cards = self.player_hole_cards[self.actor_index]
-            action_type, amount = timeout(lambda: self.players[self.actor_index].get_action(
+            action_type, amount = self.players[self.actor_index].get_action(
                 gamestate, hole_cards
-            ), seconds=1, default=("default_action", 0))
+            )
 
             # Validate and correct action
             action_type, amount = PlayerJudge.validate_action(

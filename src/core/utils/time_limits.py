@@ -1,7 +1,18 @@
 import signal
 import functools
+from typing import Callable
 
-def timeout(func, seconds=5, default=None, *args, **kwargs):
+def timeout(func: Callable, seconds: int=5, default: any=None, *args, **kwargs) -> any:
+    """Runs a function. If the function exceeds the time limit, a default value is returned.
+
+    Args:
+        func (Callable): The function to call.
+        seconds (int): The time limit.
+        default (any): Default return value.
+
+    Returns:
+        any: The function result or the default return value.
+    """
 
     def handle_timeout(signum, frame):
         raise TimeoutError()
