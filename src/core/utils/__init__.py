@@ -1,5 +1,5 @@
-from .time_limits import timeout
+from .sandbox import SandboxedPlayer
 
 __all__ = [
-    "timeout",
+    "SandboxedPlayer",
 ]

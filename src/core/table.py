@@ -5,8 +5,7 @@ from .player import Player
 from .data_classes import PlayerPublicInfo, Pot, Action
 from .gamestate import PublicGamestate
 from .deck_manager import DeckManager
-from ..core.utils import timeout
-from ..core.utils.sandbox import SandboxedPlayer
+from ..core.utils import SandboxedPlayer
 from ..helpers.player_judge import PlayerJudge
 from ..helpers.hand_judge import HandJudge
 
