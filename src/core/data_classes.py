@@ -85,3 +85,18 @@ class Action:
             action_type=data["action_type"],
             amount=data["amount"]
         )
+
+
+@dataclass
+class StreetHistory:
+    """Per-street action history with community cards on the board.
+
+    Attributes:
+        community_cards: Community cards on the board during this street (0-5 cards).
+        actions: List of actions taken on this street.
+    """
+    community_cards: List[str]
+    actions: List[Action]
+
+    def __repr__(self) -> str:
+        return f"StreetHistory(community_cards={self.community_cards}, actions={len(self.actions)} items)"
