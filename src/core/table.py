@@ -622,6 +622,7 @@ class Table:
             - total_pot: Final pot size
             - ended_early: Whether hand ended before river
             - showdown: Whether hand went to showdown
+            - showdown_details: When showdown is True, dict with 'players' and 'hands'; otherwise None
         """
         # Initialize hand
         self.reset_hand_state()
@@ -645,6 +646,7 @@ class Table:
                 "total_pot": sum(w[1] for w in winners.values()),
                 "ended_early": ended_early,
                 "showdown": showdown,
+                "showdown_details": None,
                 "final_street": "preflop"
             }
 
@@ -662,6 +664,7 @@ class Table:
                 "total_pot": sum(w[1] for w in winners.values()),
                 "ended_early": ended_early,
                 "showdown": showdown,
+                "showdown_details": None,
                 "final_street": "flop"
             }
 
@@ -679,6 +682,7 @@ class Table:
                 "total_pot": sum(w[1] for w in winners.values()),
                 "ended_early": ended_early,
                 "showdown": showdown,
+                "showdown_details": None,
                 "final_street": "turn"
             }
 
@@ -692,12 +696,26 @@ class Table:
         eliminated = self.check_eliminations()
         self._finalize_hand()
 
+        if showdown:
+            active_players = [
+                i for i, info in enumerate(self.player_public_infos) if info.active
+            ]
+            hands = {}
+            for idx in active_players:
+                hole = self.player_hole_cards[idx]
+                if hole is not None and self.community_cards:
+                    hands[idx] = HandJudge.evaluate_hand(hole, self.community_cards)[0]
+            showdown_details = {"players": active_players, "hands": hands}
+        else:
+            showdown_details = None
+
         return {
             "winners": winners,
             "eliminated": eliminated,
             "total_pot": sum(w[1] for w in winners.values()),
             "ended_early": ended_early,
             "showdown": showdown,
+            "showdown_details": showdown_details,
             "final_street": "river"
         }
 
