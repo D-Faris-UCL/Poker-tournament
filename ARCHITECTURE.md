@@ -50,7 +50,7 @@ This is a complete No-Limit Texas Hold'em tournament simulator designed for AI b
 
 | Method | Purpose |
 |--------|---------|
-| `simulate_hand()` | Orchestrates a complete hand from deal to showdown |
+| `simulate_hand()` | Orchestrates a complete hand from deal to showdown; returns dict with `winners`, `eliminated`, `total_pot`, `ended_early`, `showdown` (bool), `final_street`, and when showdown is True, `showdown_details` (dict with `players` and `hands`) |
 | `run_betting_round(street)` | Executes betting logic for a single street |
 | `_reconcile_bets_to_pots()` | Creates side pots for all-in scenarios |
 | `end_hand()` | Evaluates hands and distributes winnings |
@@ -65,7 +65,7 @@ This is a complete No-Limit Texas Hold'em tournament simulator designed for AI b
 - `pots`: List of Pot objects (index 0 = main pot, 1+ = side pots)
 - `total_pot`: Aggregate chip total across all pots
 - `blinds_schedule`: Dict mapping round number to (SB, BB)
-- `current_hand_history`: Actions by street
+- `current_hand_history`: Per-street action history (Dict[str, StreetHistory]; each street has `community_cards` and `actions`)
 - `hand_contributions`: Cumulative bets per player for pot calculation
 
 **Betting Round Algorithm:**
@@ -136,8 +136,8 @@ def get_action(
 | `blinds` | Tuple[int, int] | Current (small_blind, big_blind) |
 | `blinds_schedule` | Dict[int, Tuple[int, int]] | Future blind levels |
 | `minimum_raise_amount` | int | Minimum valid raise size |
-| `current_hand_history` | Dict[str, List[Action]] | Actions by street |
-| `previous_hand_histories` | List[Dict[...]] | Past hand histories |
+| `current_hand_history` | Dict[str, StreetHistory] | Per-street history: each value has `community_cards` and `actions` |
+| `previous_hand_histories` | List[Dict[str, StreetHistory]] | Past hand histories (same shape) |
 
 **Utility Methods:**
 - `get_current_street()`: Returns 'preflop', 'flop', 'turn', or 'river'
@@ -536,7 +536,7 @@ Players implement the `Player` interface, allowing different bot strategies to b
 - **Antes:** Modify `collect_blinds()` to collect antes
 - **Different Poker Variants:** Extend `HandJudge` with new hand rankings
 - **Tournament Payouts:** Add payout structure to Table
-- **Hand Logging:** Extend `current_hand_history` tracking
+- **Hand Logging:** Hand history is already per-street (`StreetHistory` with `community_cards` and `actions`); extend as needed
 - **Real-time Visualization:** Hook into betting round callbacks
 
 ## File Structure
