@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Tuple, Optional
 from .player import Player
-from .data_classes import PlayerPublicInfo, Pot, Action
+from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory
 from .gamestate import PublicGamestate
 from .deck_manager import DeckManager
 from ..helpers.player_judge import PlayerJudge
@@ -73,13 +73,13 @@ class Table:
         self.blinds_schedule = blinds_schedule
         self.actor_index = 0
         self.minimum_raise_amount = self.blinds[1]  # BB to start
-        self.current_hand_history: Dict[str, List[Action]] = {
-            "preflop": [],
-            "flop": [],
-            "turn": [],
-            "river": []
+        self.current_hand_history: Dict[str, StreetHistory] = {
+            "preflop": StreetHistory(community_cards=[], actions=[]),
+            "flop": StreetHistory(community_cards=[], actions=[]),
+            "turn": StreetHistory(community_cards=[], actions=[]),
+            "river": StreetHistory(community_cards=[], actions=[]),
         }
-        self.previous_hand_histories: List[Dict[str, List[Action]]] = []
+        self.previous_hand_histories: List[Dict[str, StreetHistory]] = []
 
         self.deck_manager = DeckManager(seed=seed)
 
@@ -105,7 +105,13 @@ class Table:
             blinds=self.blinds,
             blinds_schedule=self.blinds_schedule.copy(),
             minimum_raise_amount=self.minimum_raise_amount,
-            current_hand_history={k: v.copy() for k, v in self.current_hand_history.items()},
+            current_hand_history={
+                k: StreetHistory(
+                    community_cards=v.community_cards.copy(),
+                    actions=v.actions.copy(),
+                )
+                for k, v in self.current_hand_history.items()
+            },
             previous_hand_histories=self.previous_hand_histories.copy()
         )
 
@@ -148,15 +154,15 @@ class Table:
         self.hand_contributions = [0] * len(self.players)
 
         # Save previous hand history
-        if any(len(v) > 0 for v in self.current_hand_history.values()):
+        if any(len(sh.actions) > 0 for sh in self.current_hand_history.values()):
             self.previous_hand_histories.append(self.current_hand_history)
 
         # Reset current hand history
         self.current_hand_history = {
-            "preflop": [],
-            "flop": [],
-            "turn": [],
-            "river": []
+            "preflop": StreetHistory(community_cards=[], actions=[]),
+            "flop": StreetHistory(community_cards=[], actions=[]),
+            "turn": StreetHistory(community_cards=[], actions=[]),
+            "river": StreetHistory(community_cards=[], actions=[]),
         }
 
         # Reset player states
@@ -217,10 +223,10 @@ class Table:
             bb_info.is_all_in = True
 
         # Record blind actions
-        self.current_hand_history["preflop"].append(
+        self.current_hand_history["preflop"].actions.append(
             Action(small_blind_pos, "small_blind", sb_amount)
         )
-        self.current_hand_history["preflop"].append(
+        self.current_hand_history["preflop"].actions.append(
             Action(big_blind_pos, "big_blind", bb_amount)
         )
 
@@ -240,6 +246,10 @@ class Table:
         active_count = sum(1 for info in self.player_public_infos if info.active)
         if active_count <= 1:
             return False
+
+        # Set community cards for this street (preflop stays [])
+        if street in ("flop", "turn", "river"):
+            self.current_hand_history[street].community_cards = self.community_cards.copy()
 
         # Reset bets for new street (except preflop where blinds are already posted)
         if street != "preflop":
@@ -414,7 +424,7 @@ class Table:
             player_info.is_all_in = True
 
         # Record action in hand history
-        self.current_hand_history[street].append(
+        self.current_hand_history[street].actions.append(
             Action(player_idx, action_type, amount)
         )
 
