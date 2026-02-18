@@ -250,12 +250,15 @@ def test_chip_distribution():
     table.community_cards = ['2s', '3c', '4h', '6d', '8s']  # No straight, pairs win
 
     # Add action history
-    from src.core.data_classes import Action
-    table.current_hand_history["preflop"] = [
-        Action(2, "all-in", 100),
-        Action(1, "all-in", 200),
-        Action(0, "bet", 200)
-    ]
+    from src.core.data_classes import Action, StreetHistory
+    table.current_hand_history["preflop"] = StreetHistory(
+        community_cards=[],
+        actions=[
+            Action(2, "all-in", 100),
+            Action(1, "all-in", 200),
+            Action(0, "bet", 200)
+        ]
+    )
 
     # Manually create pots
     from src.core.data_classes import Pot
@@ -320,11 +323,14 @@ def test_chip_distribution():
     initial_total = sum(p.stack for p in table.player_public_infos) + table.total_pot
 
     # Add hand history
-    from src.core.data_classes import Action
-    table.current_hand_history["preflop"] = [
-        Action(0, "bet", 100),
-        Action(1, "call", 100)
-    ]
+    from src.core.data_classes import Action, StreetHistory
+    table.current_hand_history["preflop"] = StreetHistory(
+        community_cards=[],
+        actions=[
+            Action(0, "bet", 100),
+            Action(1, "call", 100)
+        ]
+    )
 
     results = table.end_hand()
 
@@ -404,13 +410,16 @@ def test_chip_distribution():
     table.community_cards = ['2s', '3c', '4h', '6d', '8s']  # No improvement, pairs win
 
     # Add action history
-    from src.core.data_classes import Action
-    table.current_hand_history["preflop"] = [
-        Action(3, "all-in", 100),
-        Action(2, "all-in", 200),
-        Action(1, "all-in", 300),
-        Action(0, "bet", 300)
-    ]
+    from src.core.data_classes import Action, StreetHistory
+    table.current_hand_history["preflop"] = StreetHistory(
+        community_cards=[],
+        actions=[
+            Action(3, "all-in", 100),
+            Action(2, "all-in", 200),
+            Action(1, "all-in", 300),
+            Action(0, "bet", 300)
+        ]
+    )
 
     # Manually create pots based on contributions
     from src.core.data_classes import Pot
@@ -503,13 +512,16 @@ def test_chip_distribution():
     table.community_cards = ['As', '7c', '6h', '5d', '3s']  # High card Ace for all
 
     # Add action history - everyone bets 100
-    from src.core.data_classes import Action
-    table.current_hand_history["preflop"] = [
-        Action(3, "all-in", 100),
-        Action(0, "bet", 100),
-        Action(1, "call", 100),
-        Action(2, "call", 100)
-    ]
+    from src.core.data_classes import Action, StreetHistory
+    table.current_hand_history["preflop"] = StreetHistory(
+        community_cards=[],
+        actions=[
+            Action(3, "all-in", 100),
+            Action(0, "bet", 100),
+            Action(1, "call", 100),
+            Action(2, "call", 100)
+        ]
+    )
 
     results = table.end_hand()
 
@@ -593,12 +605,15 @@ def test_chip_distribution():
     table.community_cards = ['2s', '3c', '4h', '6d', '8s']  # No improvement, pairs win
 
     # Add action history
-    from src.core.data_classes import Action
-    table.current_hand_history["preflop"] = [
-        Action(2, "all-in", 100),  # P2 all-in for 100
-        Action(1, "all-in", 200),  # P1 all-in for 200
-        Action(0, "bet", 200)      # P0 bets 200 to match
-    ]
+    from src.core.data_classes import Action, StreetHistory
+    table.current_hand_history["preflop"] = StreetHistory(
+        community_cards=[],
+        actions=[
+            Action(2, "all-in", 100),  # P2 all-in for 100
+            Action(1, "all-in", 200),  # P1 all-in for 200
+            Action(0, "bet", 200)      # P0 bets 200 to match
+        ]
+    )
 
     # Manually create pots
     from src.core.data_classes import Pot
