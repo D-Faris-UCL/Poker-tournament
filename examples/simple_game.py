@@ -74,14 +74,23 @@ def main():
         if result['showdown']:
             print("\n--- SHOWDOWN ---")
             print("\nActive players at showdown:")
-            for winner_idx in result['winners'].keys():
+            details = result.get('showdown_details')
+            if details and 'hands' in details:
+                for idx in details.get('players', []):
+                    hole = table.player_hole_cards[idx]
+                    hand_name = details['hands'].get(idx, '?')
+                    hand_display = hand_name.replace('_', ' ').title() if hand_name != '?' else '?'
+                    print(f"  Player {idx} ({table.players[idx].__class__.__name__}): "
+                          f"{hole} - {hand_display}")
+            else:
                 from src.helpers.hand_judge import HandJudge
-                hand_eval = HandJudge.evaluate_hand(
-                    table.player_hole_cards[winner_idx],
-                    table.community_cards
-                )
-                print(f"  Player {winner_idx} ({table.players[winner_idx].__class__.__name__}): "
-                      f"{table.player_hole_cards[winner_idx]} - {hand_eval[0].replace('_', ' ').title()}")
+                for winner_idx in result['winners'].keys():
+                    hand_eval = HandJudge.evaluate_hand(
+                        table.player_hole_cards[winner_idx],
+                        table.community_cards
+                    )
+                    print(f"  Player {winner_idx} ({table.players[winner_idx].__class__.__name__}): "
+                          f"{table.player_hole_cards[winner_idx]} - {hand_eval[0].replace('_', ' ').title()}")
         elif result['ended_early']:
             print(f"\n--- Hand ended after {result['final_street']} (all but one folded) ---")
             
