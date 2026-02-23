@@ -137,7 +137,7 @@ def get_action(
 | `blinds_schedule` | Dict[int, Tuple[int, int]] | Future blind levels |
 | `minimum_raise_amount` | int | Minimum valid raise size |
 | `current_hand_history` | Dict[str, StreetHistory] | Per-street history: each value has `community_cards` and `actions` |
-| `previous_hand_histories` | List[Dict[str, StreetHistory]] | Past hand histories (same shape) |
+| `previous_hand_histories` | List[HandRecord] | Past hands: each HandRecord has `per_street` (Dict[str, StreetHistory]) and `showdown_details` (optional dict with 'players' and 'hands') |
 
 **Utility Methods:**
 - `get_current_street()`: Returns 'preflop', 'flop', 'turn', or 'river'
@@ -536,7 +536,7 @@ Players implement the `Player` interface, allowing different bot strategies to b
 - **Antes:** Modify `collect_blinds()` to collect antes
 - **Different Poker Variants:** Extend `HandJudge` with new hand rankings
 - **Tournament Payouts:** Add payout structure to Table
-- **Hand Logging:** Hand history is already per-street (`StreetHistory` with `community_cards` and `actions`); extend as needed
+- **Hand Logging:** Hand history is per-street (`StreetHistory`) and stored as `HandRecord` (per_street + optional `showdown_details` when hand goes to showdown); extend as needed
 - **Real-time Visualization:** Hook into betting round callbacks
 
 ## File Structure
