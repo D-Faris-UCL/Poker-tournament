@@ -1,7 +1,7 @@
 """Core data classes for poker game state"""
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict, Optional
 
 
 @dataclass
@@ -100,3 +100,15 @@ class StreetHistory:
 
     def __repr__(self) -> str:
         return f"StreetHistory(community_cards={self.community_cards}, actions={len(self.actions)} items)"
+
+
+@dataclass
+class HandRecord:
+    """One hand's stored history: per-street actions and optional showdown.
+
+    Attributes:
+        per_street: Action history by street (preflop, flop, turn, river).
+        showdown_details: When hand went to showdown, dict with 'players' and 'hands'; otherwise None.
+    """
+    per_street: Dict[str, StreetHistory]
+    showdown_details: Optional[dict]

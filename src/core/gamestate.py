@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Tuple
 from copy import deepcopy
-from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory
+from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory, HandRecord
 
 
 class PublicGamestate:
@@ -23,7 +23,7 @@ class PublicGamestate:
         blinds_schedule: Schedule of blind increases
         minimum_raise_amount: Minimum valid raise amount
         current_hand_history: Actions taken in current hand by street (Dict[str, StreetHistory])
-        previous_hand_histories: History from previous hands (list of Dict[str, StreetHistory])
+        previous_hand_histories: History from previous hands (list of HandRecord: per_street + optional showdown_details)
     """
 
     def __init__(
@@ -38,7 +38,7 @@ class PublicGamestate:
         blinds_schedule: Dict[int, Tuple[int, int]],
         minimum_raise_amount: int,
         current_hand_history: Dict[str, StreetHistory],
-        previous_hand_histories: List[Dict[str, StreetHistory]]
+        previous_hand_histories: List[HandRecord]
     ):
         """Initialize public gamestate
 
@@ -53,7 +53,7 @@ class PublicGamestate:
             blinds_schedule: Dictionary mapping round to blinds
             minimum_raise_amount: Minimum raise amount
             current_hand_history: Current hand history by street (StreetHistory per street)
-            previous_hand_histories: Previous hands' histories (each a Dict[str, StreetHistory])
+            previous_hand_histories: Previous hands' histories (each a HandRecord with per_street and showdown_details)
         """
         self.round_number = round_number
         self.player_public_infos = player_public_infos
