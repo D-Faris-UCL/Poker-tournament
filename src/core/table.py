@@ -256,7 +256,11 @@ class Table:
             for info in self.player_public_infos:
                 info.current_bet = 0
             # Start action after button
-            self.actor_index = self.get_next_player_index(self.button_position)
+            self.actor_index = PlayerJudge.get_next_actor(
+                self.button_position,
+                self.player_public_infos,
+                len(self.players)
+            )
 
         # Track the last player to bet/raise (aggressor)
         last_aggressor_idx = -1
