@@ -5,6 +5,7 @@ from .player import Player
 from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory
 from .gamestate import PublicGamestate
 from .deck_manager import DeckManager
+from ..core.utils import SandboxedPlayer
 from ..helpers.player_judge import PlayerJudge
 from ..helpers.hand_judge import HandJudge
 
@@ -53,7 +54,10 @@ class Table:
             raise ValueError("Need at least 2 players")
 
         self.round_number = 1
-        self.players = players
+        self.players = [
+            SandboxedPlayer(player, max_ram_mb=500, time_limit=1.0)
+            for player in players
+        ]
         self.player_hole_cards: List[Optional[Tuple[str, str]]] = [None] * len(players)
         self.player_public_infos = [
             PlayerPublicInfo(

@@ -110,6 +110,8 @@ def main():
     print("DEMO COMPLETE!")
     print("="*60)
     print(time.time()-begin)
+    for player in table.players:
+        player.close()
 
 
 if __name__ == "__main__":
