@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Tuple, Optional
 from .player import Player
-from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory
+from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory, HandRecord
 from .gamestate import PublicGamestate
 from .deck_manager import DeckManager
 from ..core.utils import SandboxedPlayer
@@ -83,7 +83,7 @@ class Table:
             "turn": StreetHistory(community_cards=[], actions=[]),
             "river": StreetHistory(community_cards=[], actions=[]),
         }
-        self.previous_hand_histories: List[Dict[str, StreetHistory]] = []
+        self.previous_hand_histories: List[HandRecord] = []
 
         self.deck_manager = DeckManager(seed=seed)
 
@@ -156,10 +156,6 @@ class Table:
         self.pots = []
         self.minimum_raise_amount = self.blinds[1]
         self.hand_contributions = [0] * len(self.players)
-
-        # Save previous hand history
-        if any(len(sh.actions) > 0 for sh in self.current_hand_history.values()):
-            self.previous_hand_histories.append(self.current_hand_history)
 
         # Reset current hand history
         self.current_hand_history = {
@@ -648,6 +644,7 @@ class Table:
             winners = self.end_hand()
             eliminated = self.check_eliminations()
             self._finalize_hand()
+            self._save_completed_hand(None)
             return {
                 "winners": winners,
                 "eliminated": eliminated,
@@ -666,6 +663,7 @@ class Table:
             winners = self.end_hand()
             eliminated = self.check_eliminations()
             self._finalize_hand()
+            self._save_completed_hand(None)
             return {
                 "winners": winners,
                 "eliminated": eliminated,
@@ -684,6 +682,7 @@ class Table:
             winners = self.end_hand()
             eliminated = self.check_eliminations()
             self._finalize_hand()
+            self._save_completed_hand(None)
             return {
                 "winners": winners,
                 "eliminated": eliminated,
@@ -717,6 +716,7 @@ class Table:
         else:
             showdown_details = None
 
+        self._save_completed_hand(showdown_details)
         return {
             "winners": winners,
             "eliminated": eliminated,
@@ -732,6 +732,23 @@ class Table:
         self.round_number += 1
         self.advance_button()
         self.update_blinds()
+
+    def _save_completed_hand(self, showdown_details: Optional[dict]) -> None:
+        """Append current hand to previous_hand_histories with optional showdown_details, then clear current."""
+        if any(len(sh.actions) > 0 for sh in self.current_hand_history.values()):
+            per_street = {
+                k: StreetHistory(community_cards=v.community_cards.copy(), actions=v.actions.copy())
+                for k, v in self.current_hand_history.items()
+            }
+            self.previous_hand_histories.append(
+                HandRecord(per_street=per_street, showdown_details=showdown_details)
+            )
+        self.current_hand_history = {
+            "preflop": StreetHistory(community_cards=[], actions=[]),
+            "flop": StreetHistory(community_cards=[], actions=[]),
+            "turn": StreetHistory(community_cards=[], actions=[]),
+            "river": StreetHistory(community_cards=[], actions=[]),
+        }
 
     def check_eliminations(self) -> List[int]:
         """Check for eliminated players (stack = 0)
