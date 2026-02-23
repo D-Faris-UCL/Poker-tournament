@@ -60,6 +60,8 @@ class HumanPlayer(Player):
             amount = gamestate.get_bet_to_call() - gamestate.player_public_infos[
                 self.player_index
             ].current_bet
+        if action_type == "all-in" and amount == 0:
+            amount = gamestate.player_public_infos[self.player_index].stack
         return (action_type, amount)
 
 
@@ -257,19 +259,27 @@ def draw_betting_panel(
     labels = []
     if legal.get("fold"):
         labels.append(("Fold", "fold", 0))
-        
+
     if legal.get("check"):
         labels.append(("Check", "check", 0))
-        
-    if legal.get("call"):
-        call_amt = legal["call_amount"]
-        labels.append((f"Call {call_amt}", "call", 0))
-        
+
+    # Call: show when there's a bet to call and we have chips (full call or call all-in into side pots)
+    call_amt = legal.get("call_amount", 0)
+    if call_amt > 0 and info.stack > 0:
+        if info.stack >= call_amt:
+            labels.append((f"Call {call_amt}", "call", 0))
+        else:
+            labels.append((f"Call All-in {info.stack}", "call", 0))
+
     if legal.get("bet"):
         labels.append((f"Bet {bet_amt}", "bet", bet_amt))
         
     if legal.get("raise"):
         labels.append((f"Raise {raise_amt}", "raise", raise_amt))
+
+    # All-in: show whenever player has chips (so they can go all-in at any time)
+    if info.stack > 0:
+        labels.append((f"All-in {info.stack}", "all-in", 0))
 
     x = w - margin_right
     
@@ -414,6 +424,9 @@ def main() -> None:
                                 mult = RAISE_MULTIPLIERS[raise_multiplier_index]
                                 amt = compute_raise_amount(gs, HUMAN_INDEX, mult)
                                 action_queue.put(("raise", amt))
+                                break
+                            if key == "all-in":
+                                action_queue.put(("all-in", 0))
                                 break
 
         gamestate = latest_gamestate[0]
