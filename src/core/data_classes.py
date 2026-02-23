@@ -108,7 +108,7 @@ class HandRecord:
 
     Attributes:
         per_street: Action history by street (preflop, flop, turn, river).
-        showdown_details: When hand went to showdown, dict with 'players' and 'hands'; otherwise None.
+        showdown_details: When hand went to showdown, dict with 'players', 'hands', and 'hole_cards'; otherwise None.
     """
     per_street: Dict[str, StreetHistory]
     showdown_details: Optional[dict]
