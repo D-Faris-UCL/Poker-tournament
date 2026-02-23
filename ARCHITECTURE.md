@@ -50,7 +50,7 @@ This is a complete No-Limit Texas Hold'em tournament simulator designed for AI b
 
 | Method | Purpose |
 |--------|---------|
-| `simulate_hand()` | Orchestrates a complete hand from deal to showdown; returns dict with `winners`, `eliminated`, `total_pot`, `ended_early`, `showdown` (bool), `final_street`, and when showdown is True, `showdown_details` (dict with `players` and `hands`) |
+| `simulate_hand()` | Orchestrates a complete hand from deal to showdown; returns dict with `winners`, `eliminated`, `total_pot`, `ended_early`, `showdown` (bool), `final_street`, and when showdown is True, `showdown_details` (dict with `players`, `hands`, and `hole_cards`) |
 | `run_betting_round(street)` | Executes betting logic for a single street |
 | `_reconcile_bets_to_pots()` | Creates side pots for all-in scenarios |
 | `end_hand()` | Evaluates hands and distributes winnings |
@@ -137,7 +137,7 @@ def get_action(
 | `blinds_schedule` | Dict[int, Tuple[int, int]] | Future blind levels |
 | `minimum_raise_amount` | int | Minimum valid raise size |
 | `current_hand_history` | Dict[str, StreetHistory] | Per-street history: each value has `community_cards` and `actions` |
-| `previous_hand_histories` | List[HandRecord] | Past hands: each HandRecord has `per_street` (Dict[str, StreetHistory]) and `showdown_details` (optional dict with 'players' and 'hands') |
+| `previous_hand_histories` | List[HandRecord] | Past hands: each HandRecord has `per_street` (Dict[str, StreetHistory]) and `showdown_details` (optional dict with 'players', 'hands', and 'hole_cards') |
 
 **Utility Methods:**
 - `get_current_street()`: Returns 'preflop', 'flop', 'turn', or 'river'
