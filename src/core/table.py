@@ -626,7 +626,7 @@ class Table:
             - total_pot: Final pot size
             - ended_early: Whether hand ended before river
             - showdown: Whether hand went to showdown
-            - showdown_details: When showdown is True, dict with 'players' and 'hands'; otherwise None
+            - showdown_details: When showdown is True, dict with 'players', 'hands', and 'hole_cards' (player_idx -> (card, card)); otherwise None
         """
         # Initialize hand
         self.reset_hand_state()
@@ -708,11 +708,14 @@ class Table:
                 i for i, info in enumerate(self.player_public_infos) if info.active
             ]
             hands = {}
+            hole_cards: Dict[int, Tuple[str, str]] = {}
             for idx in active_players:
                 hole = self.player_hole_cards[idx]
-                if hole is not None and self.community_cards:
-                    hands[idx] = HandJudge.evaluate_hand(hole, self.community_cards)[0]
-            showdown_details = {"players": active_players, "hands": hands}
+                if hole is not None:
+                    hole_cards[idx] = hole
+                    if self.community_cards:
+                        hands[idx] = HandJudge.evaluate_hand(hole, self.community_cards)[0]
+            showdown_details = {"players": active_players, "hands": hands, "hole_cards": hole_cards}
         else:
             showdown_details = None
 
