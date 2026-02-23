@@ -402,7 +402,7 @@ def test_player_loader():
 
     # Test 1: load_players with test fixture
     print("  Testing load_players()...")
-    players = load_players('tests/test_bots')
+    players = load_players('tests/test_bots/player_loader')
     assert isinstance(players, list), "load_players should return a list"
     assert len(players) == 4, f"Should load exactly 4 bots (2 valid + 2 invalid), got {len(players)}"
 
@@ -421,7 +421,7 @@ def test_player_loader():
 
     # Test 2: get_player_names with test fixture
     print("  Testing get_player_names()...")
-    names = get_player_names('tests/test_bots')
+    names = get_player_names('tests/test_bots/player_loader')
     assert isinstance(names, list), "get_player_names should return a list"
     assert len(names) == 4, f"Should find exactly 4 bot directories with player.py, got {len(names)}"
     expected_names = ['invalid_inheritance', 'invalid_no_get_action', 'valid_bot_1', 'valid_bot_2']
@@ -447,7 +447,7 @@ def test_player_loader():
 
     # Test 5: get_player_by_name success case
     print("  Testing get_player_by_name() success...")
-    ValidBot1 = get_player_by_name('tests/test_bots', 'valid_bot_1')
+    ValidBot1 = get_player_by_name('tests/test_bots/player_loader', 'valid_bot_1')
     assert ValidBot1 is not None, "Should successfully load valid_bot_1"
     assert inspect.isclass(ValidBot1), "Should return a class"
     assert ValidBot1.__name__ == 'ValidBot1', f"Should load ValidBot1, got {ValidBot1.__name__}"
@@ -460,16 +460,16 @@ def test_player_loader():
 
     # Test 6: get_player_by_name failure cases
     print("  Testing get_player_by_name() failure cases...")
-    nonexistent = get_player_by_name('tests/test_bots', 'nonexistent_bot')
+    nonexistent = get_player_by_name('tests/test_bots/player_loader', 'nonexistent_bot')
     assert nonexistent is None, "Should return None for non-existent bot"
 
-    no_file = get_player_by_name('tests/test_bots', 'no_player_file')
+    no_file = get_player_by_name('tests/test_bots/player_loader', 'no_player_file')
     assert no_file is None, "Should return None for directory without player.py"
     print("    [PASS] get_player_by_name() handles failures correctly")
 
     # Test 7: validate_players with mixed valid/invalid bots
     print("  Testing validate_players() with mixed bots...")
-    all_players = load_players('tests/test_bots')
+    all_players = load_players('tests/test_bots/player_loader')
     validation = validate_players(all_players)
 
     assert isinstance(validation, dict), "validate_players should return a dict"
@@ -505,7 +505,7 @@ def test_player_loader():
         assert "Not a class" in reason, f"Should indicate non-class, got: {reason}"
 
     # Test with class not inheriting from Player
-    InvalidBot = get_player_by_name('tests/test_bots', 'invalid_inheritance')
+    InvalidBot = get_player_by_name('tests/test_bots/player_loader', 'invalid_inheritance')
     if InvalidBot:
         validation_no_inherit = validate_players([InvalidBot])
         assert validation_no_inherit['all_valid'] == False, "Should fail for non-Player inheritance"
@@ -521,15 +521,15 @@ def test_player_loader():
 
     # Test 9: Consistency between loader functions
     print("  Testing consistency between loader functions...")
-    names_list = get_player_names('tests/test_bots')
-    players_list = load_players('tests/test_bots')
+    names_list = get_player_names('tests/test_bots/player_loader')
+    players_list = load_players('tests/test_bots/player_loader')
 
     assert len(names_list) == len(players_list), \
         f"get_player_names count ({len(names_list)}) should match load_players count ({len(players_list)})"
 
     # Verify each name can be loaded individually
     for name in names_list:
-        player_class = get_player_by_name('tests/test_bots', name)
+        player_class = get_player_by_name('tests/test_bots/player_loader', name)
         assert player_class is not None, f"Should be able to load {name} individually"
 
     print("    [PASS] Loader functions are consistent")
