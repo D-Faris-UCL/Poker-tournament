@@ -1,6 +1,6 @@
 """Main Table class that hosts players and manages the game"""
 
-from typing import List, Dict, Tuple, Optional, Callable
+from typing import List, Dict, Tuple, Optional, Callable, Iterable
 from .player import Player
 from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory, HandRecord
 from .gamestate import PublicGamestate
@@ -42,6 +42,7 @@ class Table:
         blinds_schedule: Dict[int, Tuple[int, int]],
         seed: Optional[int] = None,
         on_after_action: Optional[Callable[[str, int], None]] = None,
+        unsandboxed_indices: Optional[Iterable[int]] = None,
     ):
         """Initialize poker table
 
@@ -51,16 +52,19 @@ class Table:
             blinds_schedule: Dictionary mapping round number to (SB, BB) tuples
             seed: Random seed for deck shuffling
             on_after_action: Optional callback (action_type, amount) called after each action.
+            unsandboxed_indices: Optional indices of players that must not be sandboxed
+                (e.g. human players holding queues/locks that cannot be pickled).
         """
         if len(players) < 2:
             raise ValueError("Need at least 2 players")
 
         self.on_after_action = on_after_action
+        _no_sandbox = set(unsandboxed_indices or ())
 
         self.round_number = 1
         self.players = [
-            SandboxedPlayer(player, max_ram_mb=500, time_limit=1.0)
-            for player in players
+            players[i] if i in _no_sandbox else SandboxedPlayer(players[i], max_ram_mb=500, time_limit=1.0)
+            for i in range(len(players))
         ]
         self.player_hole_cards: List[Optional[Tuple[str, str]]] = [None] * len(players)
         self.player_public_infos = [
@@ -120,7 +124,7 @@ class Table:
                 )
                 for k, v in self.current_hand_history.items()
             },
-            previous_hand_histories=self.previous_hand_histories.copy()
+            previous_hand_histories=self.previous_hand_histories.copy(),
             current_player=self.current_player,
         )
 

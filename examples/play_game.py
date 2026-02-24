@@ -352,6 +352,7 @@ def main() -> None:
         players=players,
         starting_stack=2000,
         blinds_schedule=blinds_schedule,
+        unsandboxed_indices=[HUMAN_INDEX],
     )
 
     gs = table.get_public_gamestate()
