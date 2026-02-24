@@ -65,6 +65,92 @@ def test_hand_evaluation():
     print("  [PASS] HandJudge tests passed")
 
 
+def test_hand_evaluation_fewer_cards():
+    """Test hand evaluation with fewer than 7 cards (before all community cards are dealt)"""
+    print("Testing HandJudge with fewer than 7 cards...")
+
+    # Test one pair with only flop (5 total cards)
+    hole_cards = ('Ah', 'Ad')
+    community = ['Ks', '7c', '3h']  # Only flop
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "one_pair", f"Should be one pair, got {hand_name}"
+    assert values[0] == 14, f"Pair should be Aces (14), got {values[0]}"
+    assert 13 in values, f"King kicker should be in values, got {values}"
+
+    # Test two pair with flop + turn (6 total cards)
+    hole_cards = ('Ah', 'Ad')
+    community = ['Ks', 'Kc', '7h', '3d']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "two_pair", f"Should be two pair, got {hand_name}"
+    assert values[0] == 14 and values[1] == 13, f"Should be Aces and Kings, got {values}"
+    assert values[2] == 7, f"Kicker should be 7, got {values[2]}"
+
+    # Test two pair with no kicker (4 total cards)
+    hole_cards = ('Ah', 'Ad')
+    community = ['Ks', 'Kc']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "two_pair", f"Should be two pair, got {hand_name}"
+    assert values[2] == 0, f"Kicker should be 0 (no kicker available), got {values[2]}"
+
+    # Test three of a kind with minimal kickers (4 total cards)
+    hole_cards = ('Ah', 'Ad')
+    community = ['As', '7c']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "three_of_a_kind", f"Should be three of a kind, got {hand_name}"
+    assert values[0] == 14, f"Trips should be Aces (14), got {values[0]}"
+    assert len(values) == 2, f"Should have trips + 1 kicker, got {len(values)} values"
+
+    # Test four of a kind with no kicker (4 total cards)
+    hole_cards = ('Ah', 'Ad')
+    community = ['As', 'Ac']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "four_of_a_kind", f"Should be four of a kind, got {hand_name}"
+    assert values[0] == 14, f"Quads should be Aces (14), got {values[0]}"
+    assert values[1] == 0, f"Kicker should be 0 (no kicker available), got {values[1]}"
+
+    # Test four of a kind with one kicker (5 total cards)
+    hole_cards = ('Ah', 'Ad')
+    community = ['As', 'Ac', 'Kh']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "four_of_a_kind", f"Should be four of a kind, got {hand_name}"
+    assert values[1] == 13, f"Kicker should be King (13), got {values[1]}"
+
+    # Test edge case: just hole cards (2 cards only)
+    hole_cards = ('Ah', 'Ad')
+    community = []
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "one_pair", f"Should be one pair, got {hand_name}"
+    assert len(values) == 1, f"Should only have pair value with no kickers, got {values}"
+
+    print("  [PASS] HandJudge with fewer cards tests passed")
+
+
+def test_hand_evaluation_edge_cases():
+    """Test edge cases in hand evaluation"""
+    print("Testing HandJudge edge cases...")
+
+    # Test full house with two trips (AAAKKK + Q) - should pick higher trips (AAA)
+    hole_cards = ('Ah', 'Ad')
+    community = ['As', 'Ks', 'Kc', 'Kh', 'Qd']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "full_house", f"Should be full house, got {hand_name}"
+    # Aces full of Kings beats Kings full of Aces - trips value is compared first
+    assert values[0] == 14, f"Should use Aces trips (14), got {values[0]}"
+    assert values[1] == 13, f"Should use Kings pair (13), got {values[1]}"
+
+    # Test two pair with three pairs - should pick top 2
+    hole_cards = ('Ah', 'Ad')
+    community = ['Ks', 'Kc', 'Qh', 'Qd', '7c']
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, community)
+    assert hand_name == "two_pair", f"Should be two pair, got {hand_name}"
+    assert len(values) == 3, f"Should have 2 pairs + kicker, got {len(values)} values"
+    # Should be A-A-K-K-Q (top 2 pairs are AA and KK, Q is kicker)
+    assert values[0] == 14, f"Top pair should be Aces (14), got {values[0]}"
+    assert values[1] == 13, f"Second pair should be Kings (13), got {values[1]}"
+
+    print("  [PASS] HandJudge edge cases tests passed")
+
+
 def test_hand_comparison():
     """Test hand comparison"""
     print("Testing hand comparison...")
@@ -316,7 +402,7 @@ def test_player_loader():
 
     # Test 1: load_players with test fixture
     print("  Testing load_players()...")
-    players = load_players('tests/test_bots')
+    players = load_players('tests/test_bots/player_loader')
     assert isinstance(players, list), "load_players should return a list"
     assert len(players) == 4, f"Should load exactly 4 bots (2 valid + 2 invalid), got {len(players)}"
 
@@ -335,7 +421,7 @@ def test_player_loader():
 
     # Test 2: get_player_names with test fixture
     print("  Testing get_player_names()...")
-    names = get_player_names('tests/test_bots')
+    names = get_player_names('tests/test_bots/player_loader')
     assert isinstance(names, list), "get_player_names should return a list"
     assert len(names) == 4, f"Should find exactly 4 bot directories with player.py, got {len(names)}"
     expected_names = ['invalid_inheritance', 'invalid_no_get_action', 'valid_bot_1', 'valid_bot_2']
@@ -361,7 +447,7 @@ def test_player_loader():
 
     # Test 5: get_player_by_name success case
     print("  Testing get_player_by_name() success...")
-    ValidBot1 = get_player_by_name('tests/test_bots', 'valid_bot_1')
+    ValidBot1 = get_player_by_name('tests/test_bots/player_loader', 'valid_bot_1')
     assert ValidBot1 is not None, "Should successfully load valid_bot_1"
     assert inspect.isclass(ValidBot1), "Should return a class"
     assert ValidBot1.__name__ == 'ValidBot1', f"Should load ValidBot1, got {ValidBot1.__name__}"
@@ -374,16 +460,16 @@ def test_player_loader():
 
     # Test 6: get_player_by_name failure cases
     print("  Testing get_player_by_name() failure cases...")
-    nonexistent = get_player_by_name('tests/test_bots', 'nonexistent_bot')
+    nonexistent = get_player_by_name('tests/test_bots/player_loader', 'nonexistent_bot')
     assert nonexistent is None, "Should return None for non-existent bot"
 
-    no_file = get_player_by_name('tests/test_bots', 'no_player_file')
+    no_file = get_player_by_name('tests/test_bots/player_loader', 'no_player_file')
     assert no_file is None, "Should return None for directory without player.py"
     print("    [PASS] get_player_by_name() handles failures correctly")
 
     # Test 7: validate_players with mixed valid/invalid bots
     print("  Testing validate_players() with mixed bots...")
-    all_players = load_players('tests/test_bots')
+    all_players = load_players('tests/test_bots/player_loader')
     validation = validate_players(all_players)
 
     assert isinstance(validation, dict), "validate_players should return a dict"
@@ -419,7 +505,7 @@ def test_player_loader():
         assert "Not a class" in reason, f"Should indicate non-class, got: {reason}"
 
     # Test with class not inheriting from Player
-    InvalidBot = get_player_by_name('tests/test_bots', 'invalid_inheritance')
+    InvalidBot = get_player_by_name('tests/test_bots/player_loader', 'invalid_inheritance')
     if InvalidBot:
         validation_no_inherit = validate_players([InvalidBot])
         assert validation_no_inherit['all_valid'] == False, "Should fail for non-Player inheritance"
@@ -435,15 +521,15 @@ def test_player_loader():
 
     # Test 9: Consistency between loader functions
     print("  Testing consistency between loader functions...")
-    names_list = get_player_names('tests/test_bots')
-    players_list = load_players('tests/test_bots')
+    names_list = get_player_names('tests/test_bots/player_loader')
+    players_list = load_players('tests/test_bots/player_loader')
 
     assert len(names_list) == len(players_list), \
         f"get_player_names count ({len(names_list)}) should match load_players count ({len(players_list)})"
 
     # Verify each name can be loaded individually
     for name in names_list:
-        player_class = get_player_by_name('tests/test_bots', name)
+        player_class = get_player_by_name('tests/test_bots/player_loader', name)
         assert player_class is not None, f"Should be able to load {name} individually"
 
     print("    [PASS] Loader functions are consistent")
@@ -478,6 +564,8 @@ def main():
 
     test_deck_manager()
     test_hand_evaluation()
+    test_hand_evaluation_fewer_cards()
+    test_hand_evaluation_edge_cases()
     test_hand_comparison()
     test_player_judge()
     test_data_classes()

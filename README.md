@@ -128,9 +128,10 @@ def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) ->
         print(f"Player {i}: Stack={player_info.stack}, Bet={player_info.current_bet}, "
               f"Active={player_info.active}, All-in={player_info.is_all_in}")
 
-    # Betting history
-    preflop_actions = gamestate.current_hand_history['preflop']
-    # Each action is an Action(player_index, action_type, amount)
+    # Betting history (each street is a StreetHistory with .community_cards and .actions)
+    preflop_street = gamestate.current_hand_history['preflop']
+    preflop_actions = preflop_street.actions  # list of Action(player_index, action_type, amount)
+    # preflop_street.community_cards is [] for preflop; flop/turn/river have the board at that street
 ```
 
 ### Step 3: Implement Simple Strategy
@@ -314,15 +315,16 @@ for pot in gamestate.pots:
 ### Betting History
 
 ```python
-# Actions in current hand
+# Each street is a StreetHistory with .community_cards and .actions
 preflop = gamestate.current_hand_history['preflop']
 flop = gamestate.current_hand_history['flop']
 turn = gamestate.current_hand_history['turn']
 river = gamestate.current_hand_history['river']
 
-# Each action is an Action object
-for action in preflop:
+# Iterate over actions; each action is an Action object
+for action in preflop.actions:
     print(f"Player {action.player_index} did {action.action_type} for {action.amount}")
+# Board at that street: preflop.community_cards ([]), flop.community_cards (3 cards), etc.
 ```
 
 ### Utility Methods
@@ -665,6 +667,7 @@ while sum(1 for p in table.player_public_infos if not p.busted) > 1:
         for player_idx in result['eliminated']:
             print(f"ELIMINATED: Player {player_idx}")
 
+    # When result['showdown'] is True, result['showdown_details'] has 'players' and 'hands' (player_idx -> hand name)
     hand_num += 1
 
 # Final standings

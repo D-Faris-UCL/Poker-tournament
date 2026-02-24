@@ -2,9 +2,10 @@
 
 from typing import List, Dict, Tuple, Optional, Callable
 from .player import Player
-from .data_classes import PlayerPublicInfo, Pot, Action
+from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory, HandRecord
 from .gamestate import PublicGamestate
 from .deck_manager import DeckManager
+from ..core.utils import SandboxedPlayer
 from ..helpers.player_judge import PlayerJudge
 from ..helpers.hand_judge import HandJudge
 
@@ -57,7 +58,10 @@ class Table:
         self.on_after_action = on_after_action
 
         self.round_number = 1
-        self.players = players
+        self.players = [
+            SandboxedPlayer(player, max_ram_mb=500, time_limit=1.0)
+            for player in players
+        ]
         self.player_hole_cards: List[Optional[Tuple[str, str]]] = [None] * len(players)
         self.player_public_infos = [
             PlayerPublicInfo(
@@ -77,13 +81,13 @@ class Table:
         self.blinds_schedule = blinds_schedule
         self.current_player = 0
         self.minimum_raise_amount = self.blinds[1]  # BB to start
-        self.current_hand_history: Dict[str, List[Action]] = {
-            "preflop": [],
-            "flop": [],
-            "turn": [],
-            "river": []
+        self.current_hand_history: Dict[str, StreetHistory] = {
+            "preflop": StreetHistory(community_cards=[], actions=[]),
+            "flop": StreetHistory(community_cards=[], actions=[]),
+            "turn": StreetHistory(community_cards=[], actions=[]),
+            "river": StreetHistory(community_cards=[], actions=[]),
         }
-        self.previous_hand_histories: List[Dict[str, List[Action]]] = []
+        self.previous_hand_histories: List[HandRecord] = []
 
         self.deck_manager = DeckManager(seed=seed)
 
@@ -109,8 +113,14 @@ class Table:
             blinds=self.blinds,
             blinds_schedule=self.blinds_schedule.copy(),
             minimum_raise_amount=self.minimum_raise_amount,
-            current_hand_history={k: v.copy() for k, v in self.current_hand_history.items()},
-            previous_hand_histories=self.previous_hand_histories.copy(),
+            current_hand_history={
+                k: StreetHistory(
+                    community_cards=v.community_cards.copy(),
+                    actions=v.actions.copy(),
+                )
+                for k, v in self.current_hand_history.items()
+            },
+            previous_hand_histories=self.previous_hand_histories.copy()
             current_player=self.current_player,
         )
 
@@ -152,16 +162,12 @@ class Table:
         self.minimum_raise_amount = self.blinds[1]
         self.hand_contributions = [0] * len(self.players)
 
-        # Save previous hand history
-        if any(len(v) > 0 for v in self.current_hand_history.values()):
-            self.previous_hand_histories.append(self.current_hand_history)
-
         # Reset current hand history
         self.current_hand_history = {
-            "preflop": [],
-            "flop": [],
-            "turn": [],
-            "river": []
+            "preflop": StreetHistory(community_cards=[], actions=[]),
+            "flop": StreetHistory(community_cards=[], actions=[]),
+            "turn": StreetHistory(community_cards=[], actions=[]),
+            "river": StreetHistory(community_cards=[], actions=[]),
         }
 
         # Reset player states
@@ -222,10 +228,10 @@ class Table:
             bb_info.is_all_in = True
 
         # Record blind actions
-        self.current_hand_history["preflop"].append(
+        self.current_hand_history["preflop"].actions.append(
             Action(small_blind_pos, "small_blind", sb_amount)
         )
-        self.current_hand_history["preflop"].append(
+        self.current_hand_history["preflop"].actions.append(
             Action(big_blind_pos, "big_blind", bb_amount)
         )
         if self.on_after_action:
@@ -249,13 +255,16 @@ class Table:
         if active_count <= 1:
             return False
 
+        # Set community cards for this street (preflop stays [])
+        if street in ("flop", "turn", "river"):
+            self.current_hand_history[street].community_cards = self.community_cards.copy()
+
         # Reset bets for new street (except preflop where blinds are already posted)
         if street != "preflop":
             for info in self.player_public_infos:
                 info.current_bet = 0
-            # Start action after button - use get_next_actor so we skip folded players
-            # (get_next_player_index only skips busted; first_actor must be active for break condition)
-            self.current_player = PlayerJudge.get_next_actor(
+            # Start action after button
+            self.actor_index = PlayerJudge.get_next_actor(
                 self.button_position,
                 self.player_public_infos,
                 len(self.players)
@@ -429,7 +438,7 @@ class Table:
             player_info.is_all_in = True
 
         # Record action in hand history
-        self.current_hand_history[street].append(
+        self.current_hand_history[street].actions.append(
             Action(player_idx, action_type, amount)
         )
 
@@ -627,6 +636,7 @@ class Table:
             - total_pot: Final pot size
             - ended_early: Whether hand ended before river
             - showdown: Whether hand went to showdown
+            - showdown_details: When showdown is True, dict with 'players', 'hands', and 'hole_cards' (player_idx -> (card, card)); otherwise None
         """
         # Initialize hand
         self.reset_hand_state()
@@ -644,12 +654,14 @@ class Table:
             winners = self.end_hand()
             eliminated = self.check_eliminations()
             self._finalize_hand()
+            self._save_completed_hand(None)
             return {
                 "winners": winners,
                 "eliminated": eliminated,
                 "total_pot": sum(w[1] for w in winners.values()),
                 "ended_early": ended_early,
                 "showdown": showdown,
+                "showdown_details": None,
                 "final_street": "preflop"
             }
 
@@ -661,12 +673,14 @@ class Table:
             winners = self.end_hand()
             eliminated = self.check_eliminations()
             self._finalize_hand()
+            self._save_completed_hand(None)
             return {
                 "winners": winners,
                 "eliminated": eliminated,
                 "total_pot": sum(w[1] for w in winners.values()),
                 "ended_early": ended_early,
                 "showdown": showdown,
+                "showdown_details": None,
                 "final_street": "flop"
             }
 
@@ -678,12 +692,14 @@ class Table:
             winners = self.end_hand()
             eliminated = self.check_eliminations()
             self._finalize_hand()
+            self._save_completed_hand(None)
             return {
                 "winners": winners,
                 "eliminated": eliminated,
                 "total_pot": sum(w[1] for w in winners.values()),
                 "ended_early": ended_early,
                 "showdown": showdown,
+                "showdown_details": None,
                 "final_street": "turn"
             }
 
@@ -697,12 +713,30 @@ class Table:
         eliminated = self.check_eliminations()
         self._finalize_hand()
 
+        if showdown:
+            active_players = [
+                i for i, info in enumerate(self.player_public_infos) if info.active
+            ]
+            hands = {}
+            hole_cards: Dict[int, Tuple[str, str]] = {}
+            for idx in active_players:
+                hole = self.player_hole_cards[idx]
+                if hole is not None:
+                    hole_cards[idx] = hole
+                    if self.community_cards:
+                        hands[idx] = HandJudge.evaluate_hand(hole, self.community_cards)[0]
+            showdown_details = {"players": active_players, "hands": hands, "hole_cards": hole_cards}
+        else:
+            showdown_details = None
+
+        self._save_completed_hand(showdown_details)
         return {
             "winners": winners,
             "eliminated": eliminated,
             "total_pot": sum(w[1] for w in winners.values()),
             "ended_early": ended_early,
             "showdown": showdown,
+            "showdown_details": showdown_details,
             "final_street": "river"
         }
 
@@ -711,6 +745,23 @@ class Table:
         self.round_number += 1
         self.advance_button()
         self.update_blinds()
+
+    def _save_completed_hand(self, showdown_details: Optional[dict]) -> None:
+        """Append current hand to previous_hand_histories with optional showdown_details, then clear current."""
+        if any(len(sh.actions) > 0 for sh in self.current_hand_history.values()):
+            per_street = {
+                k: StreetHistory(community_cards=v.community_cards.copy(), actions=v.actions.copy())
+                for k, v in self.current_hand_history.items()
+            }
+            self.previous_hand_histories.append(
+                HandRecord(per_street=per_street, showdown_details=showdown_details)
+            )
+        self.current_hand_history = {
+            "preflop": StreetHistory(community_cards=[], actions=[]),
+            "flop": StreetHistory(community_cards=[], actions=[]),
+            "turn": StreetHistory(community_cards=[], actions=[]),
+            "river": StreetHistory(community_cards=[], actions=[]),
+        }
 
     def check_eliminations(self) -> List[int]:
         """Check for eliminated players (stack = 0)
