@@ -15,7 +15,7 @@ def print_game_state(table: Table, street: str = ""):
     print(f"\n{'='*60}")
     if street:
         print(f"STREET: {street.upper()}")
-    print(f"Round: {table.round_number} | Pot: {table.total_pot} | Blinds: {table.blinds}")
+    print(f"Round: {table.round_number-1} | Pot: {table.total_pot} | Blinds: {table.blinds}")
     print(f"Community Cards: {table.community_cards if table.community_cards else 'None'}")
     print(f"\nPlayers:")
     for i, (player, info) in enumerate(zip(table.players, table.player_public_infos)):
@@ -36,7 +36,7 @@ def main():
     # Load all available bots
     player_classes = load_players('src/bots')
 
-    # Create bot instances (using first 3 available bots)
+    # Create bot instances
     bots = [player_class(i) for i, player_class in enumerate(player_classes)]
 
     print(f"Loaded {len(player_classes)} player classes")
@@ -104,6 +104,10 @@ def main():
         # Check for eliminations
         if result['eliminated']:
             print(f"\nPlayers eliminated: {result['eliminated']}")
+
+        remaining = sum(1 for p in table.player_public_infos if not p.busted)
+        if remaining == 1:
+            break
             
 
     print("\n" + "="*60)

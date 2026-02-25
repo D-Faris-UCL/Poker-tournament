@@ -113,27 +113,6 @@ class PublicGamestate:
         """
         return max((p.current_bet for p in self.player_public_infos), default=0)
 
-    def copy(self) -> 'PublicGamestate':
-        """Create deep copy of gamestate
-
-        Returns:
-            Deep copy of this gamestate
-        """
-        return PublicGamestate(
-            round_number=self.round_number,
-            player_public_infos=deepcopy(self.player_public_infos),
-            button_position=self.button_position,
-            community_cards=self.community_cards.copy(),
-            total_pot=self.total_pot,
-            pots=deepcopy(self.pots),
-            blinds=self.blinds,
-            blinds_schedule=self.blinds_schedule.copy(),
-            minimum_raise_amount=self.minimum_raise_amount,
-            current_hand_history=deepcopy(self.current_hand_history),
-            previous_hand_histories=deepcopy(self.previous_hand_histories),
-            current_player=self.current_player,
-        )
-
     def __repr__(self) -> str:
         street = self.get_current_street()
         active = self.get_active_players_count()

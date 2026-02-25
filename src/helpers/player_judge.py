@@ -59,7 +59,7 @@ class PlayerJudge:
     Invalid actions default to check (if possible) or fold.
     """
 
-    VALID_ACTIONS = {'fold', 'check', 'call', 'bet', 'raise', 'all-in'}
+    VALID_ACTIONS = {'fold', 'check', 'call', 'raise', 'all-in'}
 
     @staticmethod
     def get_legal_actions(
@@ -88,12 +88,10 @@ class PlayerJudge:
             'fold': True,
             'check': amount_to_call == 0,
             'call': amount_to_call > 0 and player_stack >= amount_to_call,
-            'bet': current_bet == 0 and player_stack > 0,
-            'raise': current_bet > 0 and player_stack > amount_to_call,
+            'raise': player_stack > amount_to_call if current_bet > 0 else player_stack > 0,
             'all-in': player_stack > 0,
-            'min_bet': minimum_raise if current_bet == 0 else 0,
-            'min_raise': current_bet + minimum_raise if current_bet > 0 else 0,
-            'max_bet': player_stack,
+            'min_raise': current_bet + minimum_raise if current_bet > 0 else minimum_raise,
+            'max_raise': player_stack,
             'call_amount': amount_to_call
         }
 
@@ -170,50 +168,49 @@ class PlayerJudge:
                 _warn_illegal(player_idx, "call not allowed", "call", amount, "fold", 0)
                 return ('fold', 0)
 
-        # BET - when no current bet exists
-        if action_type == 'bet':
-            if not legal['bet']:
-                # Can't bet, check or fold
-                corrected = ('check', 0) if legal['check'] else ('fold', 0)
-                _warn_illegal(player_idx, "bet not allowed", action_type, amount, corrected[0], corrected[1])
-                return corrected
-
-            # Validate bet amount
-            if amount < legal['min_bet']:
-                # Bet too small, convert to check
-                _warn_illegal(player_idx, "bet below minimum", action_type, amount, "check", 0)
-                return ('check', 0)
-            elif amount > player_stack:
-                # Bet too large, go all-in
-                _warn_illegal(player_idx, "bet exceeds stack", action_type, amount, "all-in", player_stack)
-                return ('all-in', player_stack)
-            else:
-                return ('bet', amount)
-
-        # RAISE - increase current bet
+        # RAISE - increase current bet or open betting
         if action_type == 'raise':
             if not legal['raise']:
-                # Can't raise, try to call or fold
+                # Can't raise, try to check/call or fold
                 if legal['call']:
                     _warn_illegal(player_idx, "raise not allowed", "raise", amount, "call", amount_to_call)
                     return ('call', amount_to_call)
+                elif legal['check']:
+                    _warn_illegal(player_idx, "raise not allowed", "raise", amount, "check", 0)
+                    return ('check', 0)
                 else:
                     _warn_illegal(player_idx, "raise not allowed", "raise", amount, "fold", 0)
                     return ('fold', 0)
 
-            total_bet_needed = amount + player_current_bet
-
-            # Check if raise is large enough
-            if total_bet_needed < legal['min_raise']:
-                # Raise too small, just call
-                _warn_illegal(player_idx, "raise below minimum", "raise", amount, "call", amount_to_call)
-                return ('call', amount_to_call)
-            elif amount > player_stack:
-                # Raise too large, go all-in
-                _warn_illegal(player_idx, "raise exceeds stack", "raise", amount, "all-in", player_stack)
-                return ('all-in', player_stack)
+            # For opening raise (no existing bet), amount is the total bet
+            # For re-raise, amount is the additional chips needed
+            if current_bet == 0:
+                # Opening raise: amount is the total bet size
+                if amount < legal['min_raise']:
+                    # Raise too small, convert to check
+                    _warn_illegal(player_idx, "raise below minimum", "raise", amount, "check", 0)
+                    return ('check', 0)
+                elif amount > player_stack:
+                    # Raise too large, go all-in
+                    _warn_illegal(player_idx, "raise exceeds stack", "raise", amount, "all-in", player_stack)
+                    return ('all-in', player_stack)
+                else:
+                    return ('raise', amount)
             else:
-                return ('raise', amount)
+                # Re-raise: amount is additional chips from stack
+                total_bet_needed = amount + player_current_bet
+
+                # Check if raise is large enough
+                if total_bet_needed < legal['min_raise']:
+                    # Raise too small, just call
+                    _warn_illegal(player_idx, "raise below minimum", "raise", amount, "call", amount_to_call)
+                    return ('call', amount_to_call)
+                elif amount > player_stack:
+                    # Raise too large, go all-in
+                    _warn_illegal(player_idx, "raise exceeds stack", "raise", amount, "all-in", player_stack)
+                    return ('all-in', player_stack)
+                else:
+                    return ('raise', amount)
 
         # ALL-IN - bet entire stack
         if action_type == 'all-in':

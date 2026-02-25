@@ -34,8 +34,6 @@ class ValidBot1(Player):
             possible_actions.append('check')
         if legal['call']:
             possible_actions.append('call')
-        if legal['bet']:
-            possible_actions.append('bet')
         if legal['raise']:
             possible_actions.append('raise')
 
@@ -46,28 +44,28 @@ class ValidBot1(Player):
         action = random.choice(possible_actions)
 
         # Determine amount
-        if action == 'bet':
-            min_bet = legal['min_bet']
-            max_bet = min(legal['max_bet'], player_info.stack)
-            if max_bet >= min_bet:
-                amount = random.randint(min_bet, max_bet)
-            else:
-                amount = player_info.stack
-            return (action, amount)
-
-        elif action == 'raise':
-            amount_to_call = legal['call_amount']
-            min_raise_total = legal['min_raise']
-            max_raise = player_info.stack
+        if action == 'raise':
+            min_raise = legal['min_raise']
+            max_raise = legal['max_raise']
             current_player_bet = player_info.current_bet
 
-            min_raise_amount = min_raise_total - current_player_bet
-            max_raise_amount = max_raise
-
-            if max_raise_amount >= min_raise_amount:
-                amount = random.randint(min_raise_amount, max_raise_amount)
+            # If opening raise (no current bet), amount is total bet size
+            # If re-raise, amount is additional chips needed
+            if current_bet == 0:
+                # Opening raise: amount is total bet
+                if max_raise >= min_raise:
+                    amount = random.randint(min_raise, max_raise)
+                else:
+                    amount = max_raise
             else:
-                amount = max_raise
+                # Re-raise: amount is additional chips from stack
+                min_raise_amount = min_raise - current_player_bet
+                max_raise_amount = max_raise
+
+                if max_raise_amount >= min_raise_amount:
+                    amount = random.randint(min_raise_amount, max_raise_amount)
+                else:
+                    amount = max_raise_amount
 
             return (action, amount)
 
