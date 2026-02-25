@@ -289,120 +289,66 @@ class Table:
                 self.player_public_infos,
                 len(self.players)
             )
+    # Track who has had a chance to act this street
+        acted_this_street = [False] * len(self.players)
+        current_bet = max((info.current_bet for info in self.player_public_infos), default=0)
 
-        # Track the last player to bet/raise (aggressor)
-        last_aggressor_idx = -1
-        if street == "preflop":
-            # Big blind is the last aggressor preflop
-            big_blind_pos = self.get_next_player_index(
-                self.get_next_player_index(self.button_position)
-            )
-            last_aggressor_idx = big_blind_pos
-
-        # Get current bet amount (highest current_bet among all players)
-        current_bet = max(
-            (info.current_bet for info in self.player_public_infos),
-            default=0
-        )
-
-        # Track if we've gone around the table once
-        first_actor = self.current_player
-        first_action = True
-
-        # Betting loop
         while True:
-            # Check if betting is complete
-            active_players_with_chips = [
-                i for i, info in enumerate(self.player_public_infos)
-                if info.active and not info.is_all_in
-            ]
-
-            # If only one player has chips left, betting is complete
-            if len(active_players_with_chips) <= 1:
-                break
-
-            # If all active players have matched the bet, check if we're done
-            all_matched = all(
-                info.current_bet == current_bet or info.is_all_in
-                for info in self.player_public_infos
-                if info.active
-            )
-
-            # If all matched and we've returned to the last aggressor (or no aggressor), done
-            if all_matched and not first_action:
-                if last_aggressor_idx == -1:
-                    # No aggressor - need to go around the table once
-                    # Only break if we've returned to the first actor
-                    if self.current_player == first_actor:
-                        break
-                elif self.player_public_infos[last_aggressor_idx].is_all_in:
-                    # If last aggressor is all-in, we can't return to them - just check if all matched
-                    break
-                elif self.current_player == last_aggressor_idx:
-                    # Returned to the last aggressor
-                    break
-
-            current_player_info = self.player_public_infos[self.current_player]
-
-            # Skip if player is not active or is all-in
-            if not current_player_info.active or current_player_info.is_all_in:
+            # 1. Skip logic (keep this part)
+            info = self.player_public_infos[self.current_player]
+            if not info.active or info.is_all_in:
                 self.current_player = PlayerJudge.get_next_actor(
-                    self.current_player,
-                    self.player_public_infos,
-                    len(self.players)
+                    self.current_player, self.player_public_infos, len(self.players)
                 )
-                # If we've cycled back to start with no action taken, and all players matched, we're done
-                if self.current_player == first_actor and not first_action:
-                    if all_matched:
-                        break
+                # Check if everyone else is all-in or folded
+                if sum(1 for p in self.player_public_infos if p.active and not p.is_all_in) <= 1:
+                    break
                 continue
 
-            # Get action from player
+            # 2. GET ACTION (Ensure they act BEFORE we check if the round is over)
             gamestate = self.get_public_gamestate()
             hole_cards = self.player_hole_cards[self.current_player]
-            action_type, amount = self.players[self.current_player].get_action(
-                gamestate, hole_cards
-            )
+            action_type, amount = self.players[self.current_player].get_action(gamestate, hole_cards)
 
-            # Validate and correct action
+            # 3. Validate & Execute
             action_type, amount = PlayerJudge.validate_action(
-                self.current_player,
-                action_type,
-                amount,
-                self.player_public_infos,
-                current_bet,
-                self.minimum_raise_amount
+                self.current_player, action_type, amount, self.player_public_infos, 
+                current_bet, self.minimum_raise_amount
             )
-
-            # Execute the action
             self._execute_action(self.current_player, action_type, amount, street)
-            if self.on_after_action:
-                self.on_after_action(action_type, amount)
+            acted_this_street[self.current_player] = True
 
-            # Update last aggressor and current bet
+            # 4. Update Aggressor & Minimum Raise
             if action_type in ['raise', 'all-in']:
-                old_current_bet = current_bet
-                new_total_bet = current_player_info.current_bet
+                new_total_bet = self.player_public_infos[self.current_player].current_bet
                 if new_total_bet > current_bet:
-                    last_aggressor_idx = self.current_player
-                    current_bet = new_total_bet
-                    # minimum_raise_amount should be the size of the raise
-                    self.minimum_raise_amount = new_total_bet - old_current_bet
+                    raise_size = new_total_bet - current_bet
 
-            # Move to next player
-            first_action = False
+                    if raise_size >= self.minimum_raise_amount:
+                        self.minimum_raise_amount = raise_size
+                    
+                    current_bet = new_total_bet
+
+            # 5. Advance to Next Player
             self.current_player = PlayerJudge.get_next_actor(
-                self.current_player,
-                self.player_public_infos,
-                len(self.players)
+                self.current_player, self.player_public_infos, len(self.players)
             )
 
-        # After betting round, reconcile bets into pots (creates side pots as needed)
-        self._reconcile_bets_to_pots()
+            # 6. COMPLETION CHECK
+            # The round is over if:
+            # - Everyone active has acted AT LEAST once
+            # - Everyone active has matched the current_bet (or is all-in)
+            all_acted = all(info.busted or not info.active or info.is_all_in or acted_this_street[i] 
+                            for i, info in enumerate(self.player_public_infos))
+            
+            all_matched = all(info.busted or not info.active or info.is_all_in or info.current_bet == current_bet 
+                            for info in self.player_public_infos)
 
-        # Check if hand should continue
-        active_count = sum(1 for info in self.player_public_infos if info.active)
-        return active_count > 1
+            if all_acted and all_matched:
+                break
+
+        self._reconcile_bets_to_pots()
+        return sum(1 for info in self.player_public_infos if info.active) > 1
 
     def _execute_action(
         self,
@@ -423,6 +369,7 @@ class Table:
 
         if action_type == 'fold':
             player_info.active = False
+            self.player_hole_cards[player_idx] = None
 
         elif action_type == 'check':
             # No state change needed
