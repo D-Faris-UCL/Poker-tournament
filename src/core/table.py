@@ -284,7 +284,7 @@ class Table:
             for info in self.player_public_infos:
                 info.current_bet = 0
             # Start action after button
-            self.actor_index = PlayerJudge.get_next_actor(
+            self.current_player = PlayerJudge.get_next_actor(
                 self.button_position,
                 self.player_public_infos,
                 len(self.players)
