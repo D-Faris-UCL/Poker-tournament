@@ -41,6 +41,7 @@ class Table:
         starting_stack: int,
         blinds_schedule: Dict[int, Tuple[int, int]],
         seed: Optional[int] = None,
+        restricted: Optional[bool] = True,
         on_after_action: Optional[Callable[[str, int], None]] = None,
         unsandboxed_indices: Optional[Iterable[int]] = None,
     ):
@@ -62,10 +63,13 @@ class Table:
         _no_sandbox = set(unsandboxed_indices or ())
 
         self.round_number = 1
-        self.players = [
-            players[i] if i in _no_sandbox else SandboxedPlayer(players[i], max_ram_mb=500, time_limit=1.0)
-            for i in range(len(players))
-        ]
+        if restricted:
+            self.players = [
+                players[i] if i in _no_sandbox else SandboxedPlayer(players[i], max_ram_mb=500, time_limit=1.0)
+                for i in range(len(players))
+            ]
+        else:
+            self.players = players
         self.player_hole_cards: List[Optional[Tuple[str, str]]] = [None] * len(players)
         self.player_public_infos = [
             PlayerPublicInfo(
@@ -94,6 +98,7 @@ class Table:
         self.previous_hand_histories: List[HandRecord] = []
 
         self.deck_manager = DeckManager(seed=seed)
+        self.restricted = restricted
 
         # Track total chips in play for verification
         self.total_chips_in_play = starting_stack * len(players)
@@ -107,36 +112,51 @@ class Table:
         Returns:
             PublicGamestate object with visible information only
         """
-        return PublicGamestate(
-            round_number=self.round_number,
-            player_public_infos=self.player_public_infos.copy(),
-            button_position=self.button_position,
-            community_cards=self.community_cards.copy(),
-            total_pot=self.total_pot,
-            pots=[Pot(pot.amount, pot.eligible_players.copy()) for pot in self.pots],
-            blinds=self.blinds,
-            blinds_schedule=self.blinds_schedule.copy(),
-            minimum_raise_amount=self.minimum_raise_amount,
-            current_hand_history={
-                k: StreetHistory(
-                    community_cards=v.community_cards.copy(),
-                    actions=v.actions.copy(),
-                )
-                for k, v in self.current_hand_history.items()
-            },
-            previous_hand_histories=[
-                HandRecord(
-                    per_street={
-                        k: StreetHistory(
-                            community_cards=v.community_cards.copy(),
-                            actions=v.actions.copy(),
-                        )
-                        for k, v in i.per_street.items()
-                    },
-                    showdown_details=i.showdown_details.copy() if i.showdown_details else None
-                )
-            for i in self.previous_hand_histories]
-        )
+        if self.restricted:
+            return PublicGamestate(
+                round_number=self.round_number,
+                player_public_infos=self.player_public_infos.copy(),
+                button_position=self.button_position,
+                community_cards=self.community_cards.copy(),
+                total_pot=self.total_pot,
+                pots=[Pot(pot.amount, pot.eligible_players.copy()) for pot in self.pots],
+                blinds=self.blinds,
+                blinds_schedule=self.blinds_schedule.copy(),
+                minimum_raise_amount=self.minimum_raise_amount,
+                current_hand_history={
+                    k: StreetHistory(
+                        community_cards=v.community_cards.copy(),
+                        actions=v.actions.copy(),
+                    )
+                    for k, v in self.current_hand_history.items()
+                },
+                previous_hand_histories=[
+                    HandRecord(
+                        per_street={
+                            k: StreetHistory(
+                                community_cards=v.community_cards.copy(),
+                                actions=v.actions.copy(),
+                            )
+                            for k, v in i.per_street.items()
+                        },
+                        showdown_details=i.showdown_details.copy() if i.showdown_details else None
+                    )
+                for i in self.previous_hand_histories]
+            )
+        else:
+            return PublicGamestate(
+                round_number=self.round_number,
+                player_public_infos=self.player_public_infos,
+                button_position=self.button_position,
+                community_cards=self.community_cards,
+                total_pot=self.total_pot,
+                pots=self.pots,
+                blinds=self.blinds,
+                blinds_schedule=self.blinds_schedule,
+                minimum_raise_amount=self.minimum_raise_amount,
+                current_hand_history=self.current_hand_history,
+                previous_hand_histories=self.previous_hand_histories
+            )
 
     def get_next_player_index(self, current_index: int) -> int:
         """Get next non-busted player index
@@ -756,10 +776,9 @@ class Table:
         # Calculate actual total chips
         player_chips = sum(info.stack for info in self.player_public_infos)
         current_bets = sum(info.current_bet for info in self.player_public_infos)
-        pot_chips = self.total_pot
         pots_chips = sum(pot.amount for pot in self.pots)
 
-        actual_total = player_chips + current_bets + pot_chips + pots_chips
+        actual_total = player_chips + current_bets + pots_chips
 
         is_valid = actual_total == self.total_chips_in_play
 
