@@ -116,7 +116,18 @@ class Table:
                 )
                 for k, v in self.current_hand_history.items()
             },
-            previous_hand_histories=self.previous_hand_histories.copy()
+            previous_hand_histories=[
+                HandRecord(
+                    per_street={
+                        k: StreetHistory(
+                            community_cards=v.community_cards.copy(),
+                            actions=v.actions.copy(),
+                        )
+                        for k, v in i.per_street.items()
+                    },
+                    showdown_details=i.showdown_details.copy() if i.showdown_details else None
+                )
+            for i in self.previous_hand_histories]
         )
 
     def get_next_player_index(self, current_index: int) -> int:
@@ -201,8 +212,14 @@ class Table:
 
     def collect_blinds(self) -> None:
         """Collect small and big blinds at start of hand"""
-        small_blind_pos = self.get_next_player_index(self.button_position)
-        big_blind_pos = self.get_next_player_index(small_blind_pos)
+        active_player_count = sum(1 for info in self.player_public_infos if not info.busted)
+        if active_player_count == 2:
+            # Heads-up: the button posts the small blind
+            small_blind_pos = self.button_position
+            big_blind_pos = self.get_next_player_index(self.button_position)
+        else:
+            small_blind_pos = self.get_next_player_index(self.button_position)
+            big_blind_pos = self.get_next_player_index(small_blind_pos)
 
         # Post small blind
         sb_info = self.player_public_infos[small_blind_pos]
@@ -351,14 +368,13 @@ class Table:
 
             # Update last aggressor and current bet
             if action_type in ['bet', 'raise', 'all-in']:
-                # Only update aggressor if this actually increases the bet
+                old_current_bet = current_bet
                 new_total_bet = current_player_info.current_bet
                 if new_total_bet > current_bet:
                     last_aggressor_idx = self.actor_index
                     current_bet = new_total_bet
-                    # Update minimum raise
-                    raise_amount = current_bet - (current_bet - (new_total_bet - amount))
-                    self.minimum_raise_amount = raise_amount
+                    # minimum_raise_amount should be the size of the raise
+                    self.minimum_raise_amount = new_total_bet - old_current_bet
 
             # Move to next player
             first_action = False
@@ -549,10 +565,11 @@ class Table:
         if len(bet_levels) == 1:
             total_to_add = sum(info.current_bet for info in self.player_public_infos)
 
-            # Determine eligible players (all active players)
+            # Determine eligible players
+            level = bet_levels[0]
             eligible = [
                 i for i, info in enumerate(self.player_public_infos)
-                if info.active
+                if info.active and info.current_bet >= level
             ]
 
             # Add to existing main pot or create new one
@@ -733,7 +750,11 @@ class Table:
     def _finalize_hand(self) -> None:
         """Finalize hand state: increment round, advance button, update blinds"""
         self.round_number += 1
-        self.advance_button()
+        active_player_count = sum(1 for info in self.player_public_infos if not info.busted)
+        if active_player_count <= 1:
+            print("All players are busted")
+        else:
+            self.advance_button()
         self.update_blinds()
 
     def _save_completed_hand(self, showdown_details: Optional[dict]) -> None:
