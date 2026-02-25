@@ -1,83 +1,88 @@
-# Poker Tournament Framework
+# AI Poker Bot Tournament
 
-A comprehensive No-Limit Texas Hold'em tournament simulator designed for AI bot development and competitive play. Perfect for university poker competitions, research projects, and learning poker strategy through programming.
+A No-Limit Texas Hold'em tournament simulator designed for AI bot development and competitive play. Built for university AI competitions with automatic action validation, side pot calculation, and sandboxed bot execution.
+
+## Table of Contents
+
+- [Features](#features)
+- [Quickstart](#quickstart)
+- [Bot Development Guide](#bot-development-guide)
+  - [Directory Structure](#directory-structure)
+  - [Player Interface](#player-interface)
+  - [Understanding the Game State](#understanding-the-game-state)
+  - [Betting History](#betting-history)
+  - [Showdown Details](#showdown-details)
+- [Testing Your Bot](#testing-your-bot)
+- [Helper Utilities](#helper-utilities)
+- [Competition Guidelines](#competition-guidelines)
+- [Example Bots](#example-bots)
+- [Important Notes](#important-notes)
 
 ## Features
 
-- Complete Texas Hold'em implementation with all hand rankings
-- Automatic side pot calculation for complex all-in scenarios
-- Information security (bots only see public information)
-- Action validation (invalid moves automatically corrected)
-- Blind schedule support with automatic level increases
-- Deterministic mode for reproducible games
-- Zero external dependencies (pure Python)
-- Comprehensive test suite ensuring correctness
+- **Complete Texas Hold'em Implementation**: All hand rankings, betting rounds, and game mechanics
+- **Automatic Side Pot Calculation**: Complex all-in scenarios handled automatically
+- **Action Validation**: Invalid moves are automatically corrected (logged for debugging)
+- **Sandboxed Execution**: Each bot runs in an isolated process with strict resource limits
+- **Information Security**: Bots only receive publicly visible information
+- **Blind Schedule Support**: Configurable blind increases throughout the tournament
+- **Deterministic Mode**: Reproducible games for testing and debugging
+- **ML-Ready**: Support for PyTorch, TensorFlow, scikit-learn, and other popular ML libraries
 
-## Quick Start
+## Quickstart
 
 ### Installation
 
-No dependencies required! Just clone and run:
+```bash
+# Clone the repository
+git clone <repository-url>
+cd poker-tournament
+
+# Install dependencies (only psutil for sandboxing)
+pip install psutil==7.2.2
+```
+
+### Run a Simple Game
 
 ```bash
-git clone <repository-url>
-cd "Poker tournament"
+# Run the example game with existing bots
+python examples/simple_game.py
+
+# Run component tests
+python tests/test_components.py
 ```
 
-### Run Your First Game
+## Bot Development Guide
 
-```python
-from src.core.table import Table
-from src.bots.exploiter_bot import ExploiterBot
-from src.bots.call_bot import CallBot
+### Directory Structure
 
-# Create 4 players
-players = [
-    ExploiterBot(0),
-    CallBot(1),
-    ExploiterBot(2),
-    CallBot(3)
-]
+Each bot **must** be in its own directory under `src/bots/`:
 
-# Define blind schedule
-blinds_schedule = {
-    1: (10, 20),      # Rounds 1-49: 10/20 blinds
-    50: (25, 50),     # Rounds 50+: 25/50 blinds
-}
-
-# Create table
-table = Table(
-    players=players,
-    starting_stack=2000,
-    blinds_schedule=blinds_schedule,
-    seed=42  # For reproducibility
-)
-
-# Run tournament until one winner
-hand_num = 1
-while sum(1 for p in table.player_public_infos if not p.busted) > 1:
-    result = table.simulate_hand()
-    print(f"Hand {hand_num}: {result}")
-    hand_num += 1
-
-# Find winner
-winner_idx = [i for i, p in enumerate(table.player_public_infos) if not p.busted][0]
-print(f"\nWinner: Player {winner_idx}")
+```
+src/bots/
+├── your_bot_name/
+│   ├── player.py          # Required: Contains your bot class
+│   └── [other files...]   # Optional: Helper modules, data files, etc.
 ```
 
-## Writing Your First Bot
+**Important**: The main bot class must be in `player.py`. You can include additional Python files or data files in your bot's folder.
 
-### Step 1: Extend the Player Class
+### Player Interface
 
-Create a new file `src/bots/my_bot.py`:
+All bots must inherit from `Player` and implement the `get_action` method:
 
 ```python
-from typing import Tuple
 from src.core.player import Player
 from src.core.gamestate import PublicGamestate
+from typing import Tuple
 
-class MyBot(Player):
-    """My custom poker bot"""
+class YourBot(Player):
+    """Your bot description"""
+
+    def __init__(self, player_index: int):
+        super().__init__(player_index)
+        # Your initialization here (optional)
+        # You can initialize strategies, load data, etc.
 
     def get_action(
         self,
@@ -85,646 +90,524 @@ class MyBot(Player):
         hole_cards: Tuple[str, str]
     ) -> Tuple[str, int]:
         """
-        Decide what action to take.
+        Make a poker decision based on current game state.
 
         Args:
-            gamestate: Current public game state
-            hole_cards: Your two hole cards (e.g., ('Ah', 'Kd'))
+            gamestate: Current public game state (see below for details)
+            hole_cards: Your two hole cards, e.g., ('Ah', 'Kd')
 
         Returns:
-            Tuple of (action_type, amount)
-            - action_type: 'fold', 'check', 'call', 'bet', 'raise', 'all-in'
-            - amount: Chip amount for the action (0 for fold/check)
+            Tuple of (action_type, amount) where:
+                - action_type: 'fold', 'check', 'call', 'raise', or 'all-in'
+                - amount: Chips for raise (0 for fold/check/call)
+
+        Example returns:
+            ('fold', 0)           # Fold your hand
+            ('check', 0)          # Check (when no one has raised)
+            ('call', 0)           # Call the current raise
+            ('raise', 100)        # Raise to 100 chips (or raise by 100 if there's an existing raise)
+            ('all-in', 0)         # Go all-in with your stack
         """
-        # Your strategy here!
-        pass
+        # Your strategy here
+        return ('call', 0)
 ```
 
-### Step 2: Understand the Gamestate
+**Card Notation:**
+- Ranks: `2-9`, `T` (ten), `J`, `Q`, `K`, `A`
+- Suits: `h` (hearts), `d` (diamonds), `c` (clubs), `s` (spades)
+- Example: `'Ah'` = Ace of hearts, `'Ts'` = Ten of spades
 
-The `PublicGamestate` object contains everything you need to know:
+### Understanding the Game State
+
+The `PublicGamestate` object contains all publicly visible information:
 
 ```python
-def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) -> Tuple[str, int]:
-    # Your position and stack
-    my_position = self.player_index
-    my_info = gamestate.player_public_infos[my_position]
-    my_stack = my_info.stack
-    my_current_bet = my_info.current_bet
+def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]):
+    # Access your player's information
+    my_info = gamestate.player_public_infos[self.player_index]
 
-    # Community cards and pot
-    community_cards = gamestate.community_cards  # List of 0-5 cards
-    total_pot = gamestate.total_pot
+    # Key game state attributes:
+    gamestate.round_number              # Current tournament round
+    gamestate.button_position           # Dealer button index
+    gamestate.community_cards           # List of community cards (0-5 cards)
+    gamestate.total_pot                 # Total chips in all pots
+    gamestate.pots                      # List of Pot objects (main pot + side pots)
+    gamestate.blinds                    # Current (small_blind, big_blind)
+    gamestate.blinds_schedule           # Full blind schedule
+    gamestate.minimum_raise_amount      # Minimum valid raise amount
 
-    # Current betting situation
-    current_street = gamestate.get_current_street()  # 'preflop', 'flop', 'turn', 'river'
-    bet_to_call = gamestate.get_bet_to_call()  # How much to call
-    amount_to_call = bet_to_call - my_current_bet  # Additional chips needed
-
-    # Other players
-    for i, player_info in enumerate(gamestate.player_public_infos):
-        if i == my_position:
-            continue
-        print(f"Player {i}: Stack={player_info.stack}, Bet={player_info.current_bet}, "
-              f"Active={player_info.active}, All-in={player_info.is_all_in}")
-
-    # Betting history (each street is a StreetHistory with .community_cards and .actions)
-    preflop_street = gamestate.current_hand_history['preflop']
-    preflop_actions = preflop_street.actions  # list of Action(player_index, action_type, amount)
-    # preflop_street.community_cards is [] for preflop; flop/turn/river have the board at that street
+    # Useful helper methods:
+    current_bet = gamestate.get_bet_to_call()           # Current amount to call
+    street = gamestate.get_current_street()             # 'preflop', 'flop', 'turn', 'river'
+    active_count = gamestate.get_active_players_count() # Number of active players
+    alive_count = gamestate.get_non_busted_players_count() # Non-eliminated players
 ```
 
-### Step 3: Implement Simple Strategy
+#### PlayerPublicInfo
 
-Here's a basic tight-aggressive bot:
+Each player's public information is available in `gamestate.player_public_infos`:
+
+```python
+# Access any player's public info
+player_info = gamestate.player_public_infos[player_index]
+
+# Available attributes:
+player_info.stack           # Current chip stack
+player_info.current_bet     # Amount committed in current betting round
+player_info.active          # True if still in the hand (not folded)
+player_info.busted          # True if eliminated from tournament
+player_info.is_all_in       # True if player is all-in
+```
+
+**Example - Check if you can afford to call:**
+
+```python
+my_info = gamestate.player_public_infos[self.player_index]
+bet_to_call = gamestate.get_bet_to_call()
+amount_to_call = bet_to_call - my_info.current_bet
+
+if my_info.stack >= amount_to_call:
+    return ('call', 0)
+else:
+    return ('fold', 0)
+```
+
+#### Pot Structure
+
+The `pots` list contains the main pot and any side pots:
+
+```python
+for i, pot in enumerate(gamestate.pots):
+    print(f"Pot {i}: {pot.amount} chips")
+    print(f"Eligible players: {pot.eligible_players}")
+
+# pot.amount           -> Total chips in this pot
+# pot.eligible_players -> List of player indices eligible to win
+```
+
+### Betting History
+
+The gamestate tracks betting history in two ways:
+
+#### 1. Current Hand History
+
+`gamestate.current_hand_history` is a dictionary mapping street names to `StreetHistory` objects:
+
+```python
+# Access current hand's betting history
+current_hand = gamestate.current_hand_history
+
+# Available streets: 'preflop', 'flop', 'turn', 'river'
+if 'preflop' in current_hand:
+    preflop = current_hand['preflop']
+    print(f"Community cards: {preflop.community_cards}")  # [] for preflop
+
+    for action in preflop.actions:
+        print(f"Player {action.player_index}: {action.action_type} {action.amount}")
+        # action.player_index -> Who made the action
+        # action.action_type  -> 'fold', 'check', 'call', 'raise', 'all-in',
+        #                        'small_blind', 'big_blind'
+        # action.amount       -> Chips involved (0 for fold/check)
+```
+
+**Example - Analyze opponent aggression:**
+
+```python
+def count_raises(self, gamestate, opponent_idx):
+    """Count how many times an opponent has raised"""
+    raises = 0
+    for street_name, street_history in gamestate.current_hand_history.items():
+        for action in street_history.actions:
+            if action.player_index == opponent_idx and action.action_type == 'raise':
+                raises += 1
+    return raises
+```
+
+#### 2. Previous Hand Histories
+
+`gamestate.previous_hand_histories` is a list of `HandRecord` objects from previous hands:
+
+```python
+# Access previous hands
+for hand_record in gamestate.previous_hand_histories:
+    # hand_record.per_street -> Dict[str, StreetHistory] (same as current_hand_history)
+    # hand_record.showdown_details -> Optional dict with showdown info
+
+    if hand_record.showdown_details:
+        details = hand_record.showdown_details
+        # details['players']    -> List of player indices at showdown
+        # details['hands']      -> Dict mapping player_idx to hand name
+        # details['hole_cards'] -> Dict mapping player_idx to (card1, card2)
+```
+
+### Showdown Details
+
+**Important**: In this tournament, **ALL active players** at showdown reveal their hole cards (not just winners). This information is available in the showdown details.
+
+```python
+# Access previous showdowns to learn opponent tendencies
+for hand_record in gamestate.previous_hand_histories:
+    if hand_record.showdown_details:
+        details = hand_record.showdown_details
+
+        for player_idx in details['players']:
+            hole_cards = details['hole_cards'][player_idx]    # e.g., ('Ah', 'Kd')
+            hand_name = details['hands'][player_idx]          # e.g., 'one_pair'
+
+            print(f"Player {player_idx} showed {hole_cards} ({hand_name})")
+```
+
+**Hand names** (returned by hand evaluator):
+- `'high_card'`
+- `'one_pair'`
+- `'two_pair'`
+- `'three_of_a_kind'`
+- `'straight'`
+- `'flush'`
+- `'full_house'`
+- `'four_of_a_kind'`
+- `'straight_flush'`
+- `'royal_flush'`
+
+### Complete Example: Building a Simple Bot
+
+Let's build a complete bot with a simple, easy-to-understand strategy. This "SimpleBot" will give you a working starting point:
+
+**Strategy:**
+- **Preflop**: Only play strong hands (pairs 9+, AK, AQ) - fold everything else
+- **Postflop**:
+  - Raise full pot with three of a kind or better
+  - Check/call with pairs or two pair
+  - Fold with nothing
+- **Safety rules**: Only raise once per betting round, check for all-ins
 
 ```python
 from typing import Tuple
 from src.core.player import Player
 from src.core.gamestate import PublicGamestate
+from src.helpers.hand_judge import HandJudge
 
-class TightAggressiveBot(Player):
-    """Plays only strong hands, bets aggressively when playing"""
+class SimpleBot(Player):
+    """A bare-bones bot that plays safe, basic poker."""
 
-    def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) -> Tuple[str, int]:
+    def __init__(self, player_index: int):
+        super().__init__(player_index)
+        # Track raises to avoid raising wars
+        self.raised_this_street = {}
+
+    def get_action(
+        self, 
+        gamestate: PublicGamestate, 
+        hole_cards: Tuple[str, str]
+    ) -> Tuple[str, int]:
+        
         my_info = gamestate.player_public_infos[self.player_index]
-        bet_to_call = gamestate.get_bet_to_call()
-        amount_to_call = bet_to_call - my_info.current_bet
-        street = gamestate.get_current_street()
+        amount_to_call = gamestate.get_bet_to_call() - my_info.current_bet
+        current_street = gamestate.get_current_street()
 
-        # Evaluate hand strength
-        hand_strength = self._evaluate_preflop_hand(hole_cards)
+        # Reset raise tracker for new streets
+        if current_street not in self.raised_this_street:
+            self.raised_this_street[current_street] = False
 
-        # Preflop strategy
-        if street == 'preflop':
-            if hand_strength >= 8:  # Premium hands (AA, KK, QQ, AK)
-                # Raise 3x big blind
-                raise_amount = gamestate.blinds[1] * 3
-                if bet_to_call > 0:
-                    # Someone already bet, re-raise
-                    additional = raise_amount - my_info.current_bet
-                    return ('raise', additional)
+        # 1. PREFLOP STRATEGY
+        if current_street == 'preflop':
+            card1, card2 = hole_cards[0][0], hole_cards[1][0]
+            high_cards = ['A', 'K', 'Q', 'J', 'T']
+            
+            # Play pairs or high cards, fold everything else
+            if card1 == card2 or card1 in high_cards or card2 in high_cards:
+                return ('call', 0) if amount_to_call > 0 else ('check', 0)
+            return ('fold', 0) if amount_to_call > 0 else ('check', 0)
+
+        # 2. POSTFLOP STRATEGY
+        hand_name, _ = HandJudge.evaluate_hand(hole_cards, gamestate.community_cards)
+        strong_hands = ['three_of_a_kind', 'straight', 'flush', 'full_house', 
+                        'four_of_a_kind', 'straight_flush', 'royal_flush']
+
+        # Strong hands: Raise (once per street)
+        if hand_name in strong_hands:
+            if not self.raised_this_street[current_street]:
+                self.raised_this_street[current_street] = True
+                amt = gamestate.total_pot # Raise potsize
+                amt = max(amt, gamestate.minimum_raise_amount)
+                if my_info.current_bet + amt > my_info.stack:
+                    return ('all-in', 0)
                 else:
-                    return ('bet', raise_amount)
+                    return ('raise', amt)
 
-            elif hand_strength >= 6:  # Strong hands (JJ, TT, AQ, AJs)
-                if amount_to_call == 0:
-                    return ('check', 0)
-                elif amount_to_call <= gamestate.blinds[1] * 2:
-                    return ('call', amount_to_call)
-                else:
-                    return ('fold', 0)
+            # If we already raised this street, just call to avoid a war
+            return ('call', 0)
 
-            else:  # Weak hands
-                if amount_to_call == 0:
-                    return ('check', 0)
-                else:
-                    return ('fold', 0)
+        # Medium hands: Just check or call
+        if hand_name in ['one_pair', 'two_pair']:
+            return ('call', 0) if amount_to_call > 0 else ('check', 0)
 
-        # Postflop: simplified strategy
-        else:
-            if amount_to_call == 0:
-                # No bet to us, bet half pot with good preflop hand
-                if hand_strength >= 7:
-                    bet_size = gamestate.total_pot // 2
-                    return ('bet', min(bet_size, my_info.stack))
-                else:
-                    return ('check', 0)
-            else:
-                # Someone bet, call if we had a good starting hand
-                if hand_strength >= 7 and amount_to_call <= my_info.stack:
-                    return ('call', amount_to_call)
-                else:
-                    return ('fold', 0)
-
-    def _evaluate_preflop_hand(self, hole_cards: Tuple[str, str]) -> int:
-        """Rate hand strength 0-10"""
-        card1, card2 = hole_cards
-
-        # Parse cards
-        rank1, suit1 = card1[0], card1[1]
-        rank2, suit2 = card2[0], card2[1]
-
-        # Convert ranks to values
-        rank_values = {'2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-                       '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14}
-        val1 = rank_values[rank1]
-        val2 = rank_values[rank2]
-        high_card = max(val1, val2)
-        low_card = min(val1, val2)
-        is_pair = (val1 == val2)
-        is_suited = (suit1 == suit2)
-
-        # Premium pairs
-        if is_pair and high_card >= 12:  # QQ, KK, AA
-            return 10
-        if is_pair and high_card >= 10:  # TT, JJ
-            return 8
-
-        # Premium non-pairs
-        if high_card == 14 and low_card >= 12:  # AK, AQ
-            return 9 if is_suited else 8
-        if high_card == 14 and low_card >= 10:  # AJ, AT
-            return 7 if is_suited else 6
-
-        # Medium pairs
-        if is_pair and high_card >= 7:  # 77-99
-            return 6
-
-        # Other broadway
-        if high_card >= 11 and low_card >= 10:  # KQ, KJ, QJ, etc.
-            return 6 if is_suited else 5
-
-        # Weak pairs
-        if is_pair:
-            return 5
-
-        # High card only
-        if high_card >= 12:
-            return 4
-
-        # Trash
-        return 2
+        # Weak hands: Fold to any raise
+        return ('fold', 0) if amount_to_call > 0 else ('check', 0)
 ```
 
-### Step 4: Test Your Bot
+**How this bot works:**
+
+1. **Preflop decisions**: Only continues with pocket pairs 9+ or Ace with King/Queen. This is very tight, but safe.
+
+2. **Postflop decisions**: Uses `HandJudge.evaluate_hand()` to categorize hand strength:
+   - **Strong** (trips+): Raise pot size
+   - **Medium** (pairs, two pair): Just check/call
+   - **Weak** (high card): Fold to raises, check otherwise
+
+3. **Safety features**:
+   - **One raise per street**: Tracks raises with `raised_this_street` dictionary to avoid raising wars
+   - **Stack protection**: Ensures we never try to raise more than our stack
+
+**Try modifying this bot:**
+- Add more starting hands (suited connectors, lower pairs)
+- Add more raise sizing depending on hand strength and board texture
+- Track opponent behavior and adjust strategy
+- Use pot odds to make better call/fold decisions
+
+## Testing Your Bot
+
+Use the provided `examples/simple_game.py` to test your bot:
 
 ```python
 from src.core.table import Table
-from src.bots.my_bot import TightAggressiveBot
-from src.bots.call_bot import CallBot
+from src.helpers.player_loader import load_players
 
-# Pit your bot against calling stations
-players = [TightAggressiveBot(i) for i in range(3)] + [CallBot(3)]
+# Load all bots from src/bots/
+player_classes = load_players('src/bots')
+bots = [player_class(i) for i, player_class in enumerate(player_classes)]
 
-blinds_schedule = {1: (10, 20)}
+# Define blind schedule
+blinds_schedule = {
+    1: (10, 20),      # Round 1: 10/20 blinds
+    50: (20, 50),     # Round 50: 20/50 blinds
+    100: (50, 100)    # Round 100: 50/100 blinds
+}
 
-table = Table(players, starting_stack=1000, blinds_schedule=blinds_schedule, seed=123)
+# Create table
+table = Table(
+    players=bots,
+    starting_stack=2000,
+    blinds_schedule=blinds_schedule,
+)
 
-# Run 50 hands
-for hand in range(50):
+# Simulate hands
+for hand_num in range(1, 150):
     result = table.simulate_hand()
-    print(f"Hand {hand+1}: Winners = {result['winners']}")
 
-    # Check if someone won
-    remaining = sum(1 for p in table.player_public_infos if not p.busted)
+    # Check for eliminations
+    if result['eliminated']:
+        print(f"Players eliminated: {result['eliminated']}")
+
+    # Check if only one player remains
+    remaining = sum(1 for p in table.get_public_gamestate().player_public_infos if not p.busted)
     if remaining == 1:
         break
 
 # Print final stacks
-for i, info in enumerate(table.player_public_infos):
-    print(f"Player {i}: {info.stack} chips (Busted: {info.busted})")
+print("Final stacks:")
+for i, player_info in enumerate(table.get_public_gamestate().player_public_infos):
+    print(f"Player {i}: {player_info.stack} chips")
+
+# Clean up
+for player in table.players:
+    player.close()
 ```
 
-## Understanding the Gamestate
+## Helper Utilities
 
-### Card Notation
+### PlayerJudge - Legal Actions
 
-Cards are represented as 2-character strings:
-- **Rank:** `2, 3, 4, 5, 6, 7, 8, 9, T, J, Q, K, A`
-- **Suit:** `h` (hearts), `d` (diamonds), `c` (clubs), `s` (spades)
-
-Examples: `'Ah'` (Ace of hearts), `'Ks'` (King of spades), `'2c'` (Two of clubs)
-
-### PlayerPublicInfo
-
-Information about each player:
+Check what actions are legal before making a decision:
 
 ```python
-player_info = gamestate.player_public_infos[player_index]
+from src.helpers.player_judge import PlayerJudge
 
-player_info.stack          # Remaining chips
-player_info.current_bet    # Amount bet on current street
-player_info.active         # Still in current hand (hasn't folded)
-player_info.busted         # Eliminated from tournament (0 chips)
-player_info.is_all_in      # All chips committed
+# Get legal actions
+legal = PlayerJudge.get_legal_actions(
+    player_idx=self.player_index,
+    player_infos=gamestate.player_public_infos,
+    current_bet=gamestate.get_bet_to_call(),
+    minimum_raise=gamestate.minimum_raise_amount
+)
+
+# Check what's legal:
+if legal['check']:
+    # Can check
+    pass
+if legal['call']:
+    # Can call (amount_to_call = legal['call_amount'])
+    pass
+if legal['raise']:
+    # Can raise (min: legal['min_raise'], max: legal['max_raise'])
+    pass
 ```
 
-### Pot Structure
+### HandJudge - Evaluate Hand Strength
 
-```python
-# Total pot across all pots
-total = gamestate.total_pot
-
-# Individual pots (for side pot scenarios)
-for pot in gamestate.pots:
-    print(f"Pot amount: {pot.amount}")
-    print(f"Eligible players: {pot.eligible_players}")  # List of player indices
-```
-
-### Betting History
-
-```python
-# Each street is a StreetHistory with .community_cards and .actions
-preflop = gamestate.current_hand_history['preflop']
-flop = gamestate.current_hand_history['flop']
-turn = gamestate.current_hand_history['turn']
-river = gamestate.current_hand_history['river']
-
-# Iterate over actions; each action is an Action object
-for action in preflop.actions:
-    print(f"Player {action.player_index} did {action.action_type} for {action.amount}")
-# Board at that street: preflop.community_cards ([]), flop.community_cards (3 cards), etc.
-```
-
-### Utility Methods
-
-```python
-# Current betting street
-street = gamestate.get_current_street()  # 'preflop', 'flop', 'turn', 'river'
-
-# Amount needed to call
-bet_to_call = gamestate.get_bet_to_call()
-
-# Active player count
-active = gamestate.get_active_players_count()
-
-# Total players remaining in tournament
-remaining = gamestate.get_non_busted_players_count()
-```
-
-## Action Validation
-
-Your bot doesn't need to worry about illegal moves - the system automatically corrects them:
-
-### Valid Actions
-
-| Action | When Valid | Amount Parameter |
-|--------|-----------|------------------|
-| `'fold'` | Anytime | `0` |
-| `'check'` | No bet to call | `0` |
-| `'call'` | Bet to call | Amount needed to match bet |
-| `'bet'` | First to bet on street | Bet size (min = big blind) |
-| `'raise'` | Someone already bet | Additional chips to add to your current_bet |
-| `'all-in'` | Anytime | Your remaining stack |
-
-### Automatic Corrections
-
-- **Fold when you can check** → Converted to check
-- **Bet when someone already bet** → Converted to call or fold
-- **Raise below minimum** → Adjusted to minimum raise
-- **Bet more than you have** → Converted to all-in
-- **Invalid amounts** → Corrected to legal values
-
-### Example Actions
-
-```python
-# Fold
-return ('fold', 0)
-
-# Check (when no bet to call)
-return ('check', 0)
-
-# Call a 50 chip bet (assuming you have 50+ current_bet less than 50)
-bet_to_call = gamestate.get_bet_to_call()
-amount_to_call = bet_to_call - my_info.current_bet
-return ('call', amount_to_call)
-
-# Bet 100 chips (when no one has bet)
-return ('bet', 100)
-
-# Raise to 200 total (if current bet is 100, you need to add 100 more to your current_bet)
-current_bet = gamestate.get_bet_to_call()
-my_current_bet = my_info.current_bet
-additional_needed = 200 - my_current_bet
-return ('raise', additional_needed)
-
-# Go all-in
-return ('all-in', my_info.stack)
-```
-
-## Advanced Bot Strategies
-
-### Hand Strength Calculation
-
-You can use the HandJudge to evaluate your hand:
+Evaluate your hand strength at any point:
 
 ```python
 from src.helpers.hand_judge import HandJudge
 
-def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) -> Tuple[str, int]:
-    # Only works postflop (need community cards)
-    if len(gamestate.community_cards) >= 3:
-        hand_name, hand_values = HandJudge.evaluate_hand(hole_cards, gamestate.community_cards)
-        print(f"I have: {hand_name}")  # e.g., "one pair", "flush", etc.
-```
+# Works with ANY number of cards (2-7 cards)
+hand_name, hand_values = HandJudge.evaluate_hand(hole_cards, gamestate.community_cards)
 
-### Opponent Modeling
+# hand_name: String like 'one_pair', 'flush', etc.
+# hand_values: List of card values for tie-breaking [14, 13, ...] (Ace high = 14)
 
-Track opponent actions to build a profile:
+# Example usage:
+if gamestate.get_current_street() == 'preflop':
+    # Evaluate just your hole cards
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, [])
+    print(f"Preflop hand: {hand_name}")
 
-```python
-class AdaptiveBot(Player):
-    def __init__(self, player_index: int):
-        super().__init__(player_index)
-        self.opponent_fold_frequency = {}  # Track how often opponents fold
-        self.opponent_aggression = {}      # Track betting patterns
-
-    def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) -> Tuple[str, int]:
-        # Update opponent models from hand history
-        self._update_opponent_models(gamestate)
-
-        # Use models to inform decisions
-        # ...
-```
-
-### Position Awareness
-
-```python
-def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) -> Tuple[str, int]:
-    button = gamestate.button_position
-    my_pos = self.player_index
-    num_players = len(gamestate.player_public_infos)
-
-    # Calculate position relative to button
-    # Button acts last postflop (best position)
-    position_offset = (my_pos - button) % num_players
-
-    if position_offset <= 2:
-        print("Early position - play tight")
-    elif position_offset <= 4:
-        print("Middle position - moderate range")
-    else:
-        print("Late position - play loose")
-```
-
-### Pot Odds Calculation
-
-```python
-def should_call_draw(self, gamestate: PublicGamestate, outs: int) -> bool:
-    """
-    Determine if calling with a draw is profitable.
-
-    Args:
-        gamestate: Current game state
-        outs: Number of cards that improve your hand
-
-    Returns:
-        True if pot odds justify calling
-    """
-    my_info = gamestate.player_public_infos[self.player_index]
-    bet_to_call = gamestate.get_bet_to_call()
-    amount_to_call = bet_to_call - my_info.current_bet
-
-    # Calculate pot odds
-    pot_after_call = gamestate.total_pot + amount_to_call
-    pot_odds = amount_to_call / pot_after_call
-
-    # Calculate equity (approximate)
-    # Outs * 2 = rough equity percentage on next card
-    # Outs * 4 = rough equity to river (from flop)
-    street = gamestate.get_current_street()
-    if street == 'flop':
-        equity = outs * 4 / 100
-    else:
-        equity = outs * 2 / 100
-
-    return equity > pot_odds
-```
-
-## Running Tournaments
-
-### Head-to-Head Match
-
-```python
-from src.core.table import Table
-from src.bots.my_bot import MyBot
-from src.bots.exploiter_bot import ExploiterBot
-
-# 1v1 match
-players = [MyBot(0), ExploiterBot(1)]
-blinds_schedule = {1: (10, 20), 50: (25, 50), 100: (50, 100)}
-
-table = Table(players, starting_stack=1500, blinds_schedule=blinds_schedule)
-
-hand_num = 1
-while sum(1 for p in table.player_public_infos if not p.busted) > 1:
-    result = table.simulate_hand()
-    hand_num += 1
-
-winner = [i for i, p in enumerate(table.player_public_infos) if not p.busted][0]
-print(f"Winner: Player {winner} after {hand_num} hands")
-```
-
-### Multi-Table Tournament
-
-```python
-# Run multiple independent tables
-winners = []
-
-for table_num in range(4):
-    players = [MyBot(i) for i in range(8)]
-    blinds_schedule = {1: (10, 20), 20: (25, 50), 40: (50, 100)}
-
-    table = Table(players, starting_stack=1000, blinds_schedule=blinds_schedule, seed=table_num)
-
-    # Play until one winner
-    while sum(1 for p in table.player_public_infos if not p.busted) > 1:
-        table.simulate_hand()
-
-    winner = [i for i, p in enumerate(table.player_public_infos) if not p.busted][0]
-    winners.append(players[winner])
-
-print(f"Table winners: {len(winners)}")
-
-# Finals table with winners
-final_table = Table(winners, starting_stack=5000, blinds_schedule=blinds_schedule)
-# ... play finals
-```
-
-### Statistical Analysis
-
-```python
-# Run many games for statistical significance
-from collections import Counter
-
-results = Counter()
-
-for game in range(100):
-    players = [MyBot(0), ExploiterBot(1), CallBot(2), RandomBot(3)]
-    table = Table(players, starting_stack=1000, blinds_schedule={1: (10, 20)}, seed=game)
-
-    while sum(1 for p in table.player_public_infos if not p.busted) > 1:
-        table.simulate_hand()
-
-    winner = [i for i, p in enumerate(table.player_public_infos) if not p.busted][0]
-    results[type(players[winner]).__name__] += 1
-
-print("Win rates:")
-for bot_name, wins in results.most_common():
-    print(f"{bot_name}: {wins}% ({wins}/100)")
-```
-
-## Example Bots
-
-### CallBot (`src/bots/call_bot.py`)
-- Always calls or checks
-- Never folds or raises
-- Baseline "calling station" strategy
-
-### RandomBot (`src/bots/random_bot.py`)
-- Makes random legal actions
-- Good for testing edge cases
-
-### ExploiterBot (`src/bots/exploiter_bot.py`)
-- Designed to beat calling stations
-- Plays premium hands aggressively
-- Folds weak hands
-- Never bluffs (opponent won't fold)
-
-## Testing and Debugging
-
-### Run Unit Tests
-
-```bash
-python -m pytest tests/test_components.py -v
-```
-
-### Run Integration Tests
-
-```bash
-python -m pytest tests/test_integration.py -v
-```
-
-### Verify Chip Conservation
-
-```python
-table = Table(players, starting_stack=1000, blinds_schedule=blinds_schedule)
-
-for _ in range(100):
-    table.simulate_hand()
-
-    is_valid, expected, actual = table.verify_chip_count()
-    if not is_valid:
-        print(f"CHIP LEAK! Expected {expected}, got {actual}")
-        break
-```
-
-### Debug Bot Decisions
-
-```python
-class DebugBot(Player):
-    def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]) -> Tuple[str, int]:
-        print(f"\n--- Player {self.player_index} Decision ---")
-        print(f"Hole cards: {hole_cards}")
-        print(f"Community: {gamestate.community_cards}")
-        print(f"Pot: {gamestate.total_pot}")
-        print(f"My stack: {gamestate.player_public_infos[self.player_index].stack}")
-        print(f"Bet to call: {gamestate.get_bet_to_call()}")
-
-        # Your decision logic here
-        action = ('call', 0)
-        print(f"Action: {action}")
-        return action
+elif gamestate.get_current_street() == 'flop':
+    # Evaluate with 5 cards (2 hole + 3 community)
+    hand_name, values = HandJudge.evaluate_hand(hole_cards, gamestate.community_cards)
+    print(f"Current hand: {hand_name}")
 ```
 
 ## Competition Guidelines
 
-### For Participants
+### Submission Requirements
 
-1. **Create one bot class** extending `Player`
-2. **No external dependencies** - pure Python only
-3. **No file I/O** or network access during games
-4. **Stateless between games** - reset state in `__init__`
-5. **Time limit:** Return action within reasonable time (suggest <100ms)
+1. **Directory Structure**: Submit a folder named `your_bot_name` containing:
+   - `player.py` - **Required**: Contains your bot class that extends `Player`
+   - Additional Python files (optional)
+   - Data files (optional)
 
-### For Organizers
+2. **Class Requirements**:
+   - Must inherit from `src.core.player.Player`
+   - Must implement `get_action(gamestate, hole_cards)` method
+   - Must call `super().__init__(player_index)` in `__init__`
+
+3. **Resource Limits**:
+   - **Time limit**: 1 second per decision
+   - **Memory limit**: 500MB RAM
+   - Exceeding limits results in automatic fold
+
+4. **Allowed Libraries**:
+   - **Python standard library** - All built-in modules
+   - **Machine Learning**: PyTorch, TensorFlow/Keras, scikit-learn
+   - **Scientific Computing**: NumPy, SciPy, Pandas
+   - **Performance**: Numba, CuPy
+   - **Your own modules** - Include any additional files in your bot folder
+
+5. **Allowed Operations**:
+   - Store state between hands (in memory or files within your bot directory)
+   - Load pre-trained models or data files
+   - Perform computations using the allowed libraries
+   - Import your own helper modules from your bot folder
+
+6. **Prohibited**:
+   - Accessing other bots' files or code
+   - Network requests
+   - System calls that could interfere with the tournament
+   - Attempting to access hidden game information
+
+### Tournament Format
+
+- Multiple bots compete in a single tournament
+- Starting stack: TBD by organizer
+- Blind schedule: TBD by organizer
+- Last bot standing wins
+
+### How Invalid Actions Are Handled
+
+**Don't worry about making illegal moves** - they are automatically corrected:
+
+- Invalid action types default to check (if possible) or fold
+- Raise below minimum becomes check/call
+- Raise exceeds stack becomes all-in
+- All corrections are logged to `illegal_moves.log` for debugging
+
+This ensures the game never crashes due to bot errors.
+
+## Example Bots
+
+Three example bots are provided in `src/bots/`:
+
+### 1. CallBot - Passive Baseline
+[src/bots/call_bot/player.py](src/bots/call_bot/player.py)
+
+Simple bot that always calls or checks (never folds, never raises). Good baseline for testing.
 
 ```python
-# Tournament structure
-from src.core.table import Table
-import importlib
+def get_action(self, gamestate, hole_cards):
+    player_info = gamestate.player_public_infos[self.player_index]
+    bet_to_call = gamestate.get_bet_to_call()
+    amount_to_call = bet_to_call - player_info.current_bet
 
-# Load bot submissions dynamically
-bot_files = ['bot1.py', 'bot2.py', 'bot3.py', ...]
-bots = []
-
-for i, bot_file in enumerate(bot_files):
-    module = importlib.import_module(bot_file.replace('.py', ''))
-    BotClass = module.Bot  # Assume each file has a Bot class
-    bots.append(BotClass(i))
-
-# Run tournament
-blinds_schedule = {
-    1: (10, 20),
-    30: (25, 50),
-    60: (50, 100),
-    90: (100, 200),
-}
-
-table = Table(bots, starting_stack=10000, blinds_schedule=blinds_schedule, seed=42)
-
-hand_num = 1
-while sum(1 for p in table.player_public_infos if not p.busted) > 1:
-    print(f"\n=== Hand {hand_num} ===")
-    result = table.simulate_hand()
-
-    # Print results
-    for player_idx, (hand_name, amount) in result['winners'].items():
-        print(f"Winner: Player {player_idx} ({hand_name}) wins {amount} chips")
-
-    if result['eliminated']:
-        for player_idx in result['eliminated']:
-            print(f"ELIMINATED: Player {player_idx}")
-
-    # When result['showdown'] is True, result['showdown_details'] has 'players' and 'hands' (player_idx -> hand name)
-    hand_num += 1
-
-# Final standings
-print("\n=== FINAL STANDINGS ===")
-winner_idx = [i for i, p in enumerate(table.player_public_infos) if not p.busted][0]
-print(f"Champion: {type(bots[winner_idx]).__name__}")
+    if amount_to_call == 0:
+        return ('check', 0)
+    else:
+        return ('call', 0)
 ```
 
-## Troubleshooting
+### 2. RandomBot - Random Legal Actions
+[src/bots/random_bot/player.py](src/bots/random_bot/player.py)
 
-### Bot keeps getting folded automatically
-- You're trying to fold when you can check (0 bet to call)
-- System auto-corrects this to check
+Makes random legal decisions. Uses `PlayerJudge.get_legal_actions()` to find valid actions, then randomly selects one.
 
-### Bot's raises aren't working
-- Make sure you're returning the **additional** chips needed
-- Not the total bet size
-- Example: If bet is 50 and you want to raise to 150:
-  - Current bet to you: 50
-  - Your current_bet might be 0
-  - Return `('raise', 150)` to add 150 to your current bet
+### 3. ExploiterBot - Strategic Bot
+[src/bots/exploiter_bot/player.py](src/bots/exploiter_bot/player.py)
 
-### All-in isn't registering
-- Return `('all-in', remaining_stack)`
-- Where `remaining_stack = gamestate.player_public_infos[self.player_index].stack`
+More sophisticated bot designed to exploit weak opponents. Features:
+- Tight preflop hand selection
+- Position-aware play
+- Hand strength evaluation
+- Pot-sized value raises
 
-### Can't see community cards preflop
-- `gamestate.community_cards` is empty before the flop
-- Check `len(gamestate.community_cards)` before accessing
+Study this bot to understand advanced concepts like hand evaluation and strategic play.
 
-## Additional Resources
+## Important Notes
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed system architecture
-- [tests/](tests/) - Example usage and edge cases
-- [examples/simple_game.py](examples/simple_game.py) - Complete game example
+### Resource Limits
 
-## Contributing
+Each bot runs in a **sandboxed process** with strict limits:
+- **1 second** per decision (default, configurable)
+- **500MB RAM** (default, configurable)
+- Violations result in automatic fold and process restart
 
-To add features or fix bugs:
+### Debugging Tips
 
-1. Write tests first (`tests/`)
-2. Implement changes
-3. Verify chip conservation
-4. Run full test suite
-5. Submit pull request
+1. **Invalid moves**: Check `illegal_moves.log` for action corrections
+2. **Bot crashes**: Exceptions are caught and converted to folds
+3. **Slow decisions**: If your bot times out, optimize your logic
+4. **Print statements**: Use logging or file writes (prints go to separate process)
 
-## License
+### State Persistence
 
-[Add your license here]
+You can store state between hands:
 
-## Support
+```python
+class MyBot(Player):
+    def __init__(self, player_index: int):
+        super().__init__(player_index)
+        self.opponent_stats = {}  # Persists across hands
 
-For questions or issues:
-- Open GitHub issue
-- Contact tournament organizers
-- Check existing bot implementations in `src/bots/`
+    def get_action(self, gamestate, hole_cards):
+        # Update opponent stats based on gamestate.previous_hand_histories
+        # Make decisions based on accumulated stats
+        pass
+```
 
----
+### Deterministic Testing
 
-Good luck with your poker bot! May the best algorithm win!
+For reproducible testing, pass a `seed` parameter:
+
+```python
+table = Table(
+    players=bots,
+    starting_stack=1000,
+    blinds_schedule=blinds_schedule,
+    seed=42  # Same seed = same card order
+)
+```
+
+## Questions?
+
+For questions about the tournament or technical issues, contact the tournament organizers.
+
+Good luck and may the best bot win!
