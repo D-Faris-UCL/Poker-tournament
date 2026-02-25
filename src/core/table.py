@@ -1,6 +1,6 @@
 """Main Table class that hosts players and manages the game"""
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Callable, Iterable
 from .player import Player
 from .data_classes import PlayerPublicInfo, Pot, Action, StreetHistory, HandRecord
 from .gamestate import PublicGamestate
@@ -28,7 +28,7 @@ class Table:
         pots: List of pots (index 0 is main pot, 1+ are side pots)
         blinds: Current (small_blind, big_blind)
         blinds_schedule: Schedule of blind increases by round
-        actor_index: Index of player whose turn it is
+        current_player: Index of player whose turn it is
         minimum_raise_amount: Minimum valid raise amount
         current_hand_history: Actions in current hand by street
         previous_hand_histories: History from previous hands
@@ -40,7 +40,9 @@ class Table:
         players: List[Player],
         starting_stack: int,
         blinds_schedule: Dict[int, Tuple[int, int]],
-        seed: Optional[int] = None
+        seed: Optional[int] = None,
+        on_after_action: Optional[Callable[[str, int], None]] = None,
+        unsandboxed_indices: Optional[Iterable[int]] = None,
     ):
         """Initialize poker table
 
@@ -49,14 +51,20 @@ class Table:
             starting_stack: Starting chip stack for each player
             blinds_schedule: Dictionary mapping round number to (SB, BB) tuples
             seed: Random seed for deck shuffling
+            on_after_action: Optional callback (action_type, amount) called after each action.
+            unsandboxed_indices: Optional indices of players that must not be sandboxed
+                (e.g. human players holding queues/locks that cannot be pickled).
         """
         if len(players) < 2:
             raise ValueError("Need at least 2 players")
 
+        self.on_after_action = on_after_action
+        _no_sandbox = set(unsandboxed_indices or ())
+
         self.round_number = 1
         self.players = [
-            SandboxedPlayer(player, max_ram_mb=500, time_limit=1.0)
-            for player in players
+            players[i] if i in _no_sandbox else SandboxedPlayer(players[i], max_ram_mb=500, time_limit=1.0)
+            for i in range(len(players))
         ]
         self.player_hole_cards: List[Optional[Tuple[str, str]]] = [None] * len(players)
         self.player_public_infos = [
@@ -75,7 +83,7 @@ class Table:
         self.pots: List[Pot] = []
         self.blinds = blinds_schedule.get(1, (10, 20))
         self.blinds_schedule = blinds_schedule
-        self.actor_index = 0
+        self.current_player = 0
         self.minimum_raise_amount = self.blinds[1]  # BB to start
         self.current_hand_history: Dict[str, StreetHistory] = {
             "preflop": StreetHistory(community_cards=[], actions=[]),
@@ -246,9 +254,12 @@ class Table:
         self.current_hand_history["preflop"].actions.append(
             Action(big_blind_pos, "big_blind", bb_amount)
         )
+        if self.on_after_action:
+            self.on_after_action("small_blind", sb_amount)
+            self.on_after_action("big_blind", bb_amount)
 
         # Set first actor (UTG position)
-        self.actor_index = self.get_next_player_index(big_blind_pos)
+        self.current_player = self.get_next_player_index(big_blind_pos)
 
     def run_betting_round(self, street: str) -> bool:
         """Run a complete betting round for the given street
@@ -295,7 +306,7 @@ class Table:
         )
 
         # Track if we've gone around the table once
-        first_actor = self.actor_index
+        first_actor = self.current_player
         first_action = True
 
         # Betting loop
@@ -322,40 +333,40 @@ class Table:
                 if last_aggressor_idx == -1:
                     # No aggressor - need to go around the table once
                     # Only break if we've returned to the first actor
-                    if self.actor_index == first_actor:
+                    if self.current_player == first_actor:
                         break
                 elif self.player_public_infos[last_aggressor_idx].is_all_in:
                     # If last aggressor is all-in, we can't return to them - just check if all matched
                     break
-                elif self.actor_index == last_aggressor_idx:
+                elif self.current_player == last_aggressor_idx:
                     # Returned to the last aggressor
                     break
 
-            current_player_info = self.player_public_infos[self.actor_index]
+            current_player_info = self.player_public_infos[self.current_player]
 
             # Skip if player is not active or is all-in
             if not current_player_info.active or current_player_info.is_all_in:
-                self.actor_index = PlayerJudge.get_next_actor(
-                    self.actor_index,
+                self.current_player = PlayerJudge.get_next_actor(
+                    self.current_player,
                     self.player_public_infos,
                     len(self.players)
                 )
                 # If we've cycled back to start with no action taken, and all players matched, we're done
-                if self.actor_index == first_actor and not first_action:
+                if self.current_player == first_actor and not first_action:
                     if all_matched:
                         break
                 continue
 
             # Get action from player
             gamestate = self.get_public_gamestate()
-            hole_cards = self.player_hole_cards[self.actor_index]
-            action_type, amount = self.players[self.actor_index].get_action(
+            hole_cards = self.player_hole_cards[self.current_player]
+            action_type, amount = self.players[self.current_player].get_action(
                 gamestate, hole_cards
             )
 
             # Validate and correct action
             action_type, amount = PlayerJudge.validate_action(
-                self.actor_index,
+                self.current_player,
                 action_type,
                 amount,
                 self.player_public_infos,
@@ -364,22 +375,24 @@ class Table:
             )
 
             # Execute the action
-            self._execute_action(self.actor_index, action_type, amount, street)
+            self._execute_action(self.current_player, action_type, amount, street)
+            if self.on_after_action:
+                self.on_after_action(action_type, amount)
 
             # Update last aggressor and current bet
             if action_type in ['raise', 'all-in']:
                 old_current_bet = current_bet
                 new_total_bet = current_player_info.current_bet
                 if new_total_bet > current_bet:
-                    last_aggressor_idx = self.actor_index
+                    last_aggressor_idx = self.current_player
                     current_bet = new_total_bet
                     # minimum_raise_amount should be the size of the raise
                     self.minimum_raise_amount = new_total_bet - old_current_bet
 
             # Move to next player
             first_action = False
-            self.actor_index = PlayerJudge.get_next_actor(
-                self.actor_index,
+            self.current_player = PlayerJudge.get_next_actor(
+                self.current_player,
                 self.player_public_infos,
                 len(self.players)
             )
