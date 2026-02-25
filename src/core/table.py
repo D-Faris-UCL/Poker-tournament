@@ -113,7 +113,7 @@ class Table:
             button_position=self.button_position,
             community_cards=self.community_cards.copy(),
             total_pot=self.total_pot,
-            pots=self.pots.copy(),
+            pots=[Pot(pot.amount, pot.eligible_players.copy()) for pot in self.pots],
             blinds=self.blinds,
             blinds_schedule=self.blinds_schedule.copy(),
             minimum_raise_amount=self.minimum_raise_amount,
