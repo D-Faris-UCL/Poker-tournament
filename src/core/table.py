@@ -367,7 +367,7 @@ class Table:
             self._execute_action(self.actor_index, action_type, amount, street)
 
             # Update last aggressor and current bet
-            if action_type in ['bet', 'raise', 'all-in']:
+            if action_type in ['raise', 'all-in']:
                 old_current_bet = current_bet
                 new_total_bet = current_player_info.current_bet
                 if new_total_bet > current_bet:
@@ -422,17 +422,16 @@ class Table:
             if player_info.stack == 0:
                 player_info.is_all_in = True
 
-        elif action_type == 'bet':
-            player_info.stack -= amount
-            player_info.current_bet = amount
-            self.hand_contributions[player_idx] += amount
-            if player_info.stack == 0:
-                player_info.is_all_in = True
-
         elif action_type == 'raise':
-            # Amount is the additional chips from stack needed for this raise
+            # For opening raise (current_bet == 0): amount is the total bet size
+            # For re-raise: amount is the additional chips from stack needed
             player_info.stack -= amount
-            player_info.current_bet += amount
+            if player_info.current_bet == 0:
+                # Opening raise: set current_bet to amount
+                player_info.current_bet = amount
+            else:
+                # Re-raise: add amount to current_bet
+                player_info.current_bet += amount
             self.hand_contributions[player_idx] += amount
             if player_info.stack == 0:
                 player_info.is_all_in = True
