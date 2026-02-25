@@ -104,6 +104,10 @@ def main():
         # Check for eliminations
         if result['eliminated']:
             print(f"\nPlayers eliminated: {result['eliminated']}")
+
+        remaining = sum(1 for p in table.player_public_infos if not p.busted)
+        if remaining == 1:
+            break
             
 
     print("\n" + "="*60)
