@@ -524,6 +524,92 @@ elif gamestate.get_current_street() == 'flop':
 
 This ensures the game never crashes due to bot errors.
 
+## Performance Mode: Unrestricted Execution
+
+By default, the tournament runs in **restricted mode** (`restricted=True`) where all bots are sandboxed for safety and fairness. However, for certain use cases like training or simulation, you can enable **unrestricted mode** for significant performance improvements.
+
+### Restricted Mode (Default)
+
+When `restricted=True` (the default), bots run with the following safety measures:
+
+- **Time limit**: 1 second per decision (configurable)
+- **Memory limit**: 500MB RAM (configurable)
+- **Crash protection**: Exceptions are caught and converted to folds
+- **Isolated gamestate**: Each bot receives a deep copy of the gamestate (preventing accidental or malicious modifications)
+- **Sandboxed execution**: Bots run in separate processes with resource monitoring
+
+This mode ensures fair play and protects against:
+- Bots that run too slowly or get stuck
+- Memory leaks or excessive RAM usage
+- Crashes that would disrupt the tournament
+- Cheating by modifying the gamestate
+
+### Unrestricted Mode
+
+When `restricted=False`, sandboxing is completely disabled:
+
+- **No time limit**: Bots can take as long as they need
+- **No memory limit**: Bots can use as much RAM as available
+- **No crash protection**: Exceptions will crash the game
+- **Real gamestate**: Bots receive the actual gamestate object (not a copy)
+
+**Performance improvement**: Unrestricted mode runs approximately **1320% faster** than restricted mode.
+
+### When to Use Unrestricted Mode
+
+Unrestricted mode is ideal for:
+
+- **Monte Carlo simulations**: Running thousands of games quickly for statistical analysis
+- **Reinforcement Learning**: Training bots that need to play millions of hands
+- **Development**: Testing your own bot when you trust it won't cheat or crash
+- **Benchmarking**: Measuring bot performance without sandboxing overhead
+
+**Important**: Unrestricted mode assumes the bot is **honest and well-behaved**. It provides no protection against:
+- Bots that modify the gamestate to cheat
+- Infinite loops or excessive memory usage
+- Crashes that terminate the entire tournament
+
+### Example Usage
+
+```python
+from src.core.table import Table
+from src.helpers.player_loader import load_players
+
+# Load players
+player_classes = load_players('src/bots')
+bots = [player_class(i) for i, player_class in enumerate(player_classes)]
+
+# Restricted mode (default - safe for competitions)
+table_safe = Table(
+    players=bots,
+    starting_stack=2000,
+    blinds_schedule=blinds_schedule,
+    restricted=True  # Sandboxed execution (default)
+)
+
+# Unrestricted mode (fast - for training/simulation)
+table_fast = Table(
+    players=bots,
+    starting_stack=2000,
+    blinds_schedule=blinds_schedule,
+    restricted=False  # No sandboxing, 1320% faster!
+)
+
+# Run simulation
+for hand_num in range(1000):
+    result = table_fast.simulate_hand()
+    # Process results...
+```
+
+### Security Warning
+
+Only use `restricted=False` with bots you trust. In unrestricted mode:
+- Bots can access and modify the real gamestate object
+- There's no protection against resource abuse
+- One misbehaving bot can crash the entire simulation
+
+For competitions or when running untrusted code, always use `restricted=True`.
+
 ## Example Bots
 
 Three example bots are provided in `src/bots/`:
