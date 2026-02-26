@@ -57,7 +57,7 @@ class Action:
 
     Attributes:
         player_index: Index of the player who made the action
-        action_type: Type of action ('fold', 'check', 'call', 'bet', 'raise', 'all-in')
+        action_type: Type of action ('small_blind', 'big_blind', 'fold', 'check', 'call', 'raise', 'all-in')
         amount: Amount of chips involved (0 for fold/check)
     """
     player_index: int
