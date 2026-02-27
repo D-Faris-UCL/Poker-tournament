@@ -105,7 +105,7 @@ class YourBot(Player):
             ('fold', 0)           # Fold your hand
             ('check', 0)          # Check (when no one has raised)
             ('call', 0)           # Call the current raise
-            ('raise', 100)        # Raise to 100 chips (or raise by 100 if there's an existing raise)
+            ('raise', 100)        # Raise by 100 chips
             ('all-in', 0)         # Go all-in with your stack
         """
         # Your strategy here
@@ -130,7 +130,7 @@ def get_action(self, gamestate: PublicGamestate, hole_cards: Tuple[str, str]):
     gamestate.round_number              # Current tournament round
     gamestate.button_position           # Dealer button index
     gamestate.community_cards           # List of community cards (0-5 cards)
-    gamestate.total_pot                 # Total chips in all pots
+    gamestate.total_pot                 # Total chips in all pots at the start of the betting round
     gamestate.pots                      # List of Pot objects (main pot + side pots)
     gamestate.blinds                    # Current (small_blind, big_blind)
     gamestate.blinds_schedule           # Full blind schedule
@@ -440,6 +440,8 @@ if legal['call']:
     pass
 if legal['raise']:
     # Can raise (min: legal['min_raise'], max: legal['max_raise'])
+    # legal['min_raise'] - Minimum raise to amount
+    # legal['max_raise'] - Maximum raise to amount (Your stack for All-in)
     pass
 ```
 
