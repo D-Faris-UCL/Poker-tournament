@@ -33,6 +33,23 @@ class SandboxedPlayer:
         self.conn = None
         self._boot_sandbox()
 
+    @property
+    def display_name(self) -> str:
+        """Human-friendly bot name for logs/UI.
+
+        Derived from the bot folder name (e.g. src.bots.omega_bot.player -> omega_bot).
+        """
+        mod = getattr(self.user_bot.__class__, "__module__", "")
+        parts = mod.split(".")
+        # Common case: "...<bot_folder>.player"
+        if len(parts) >= 2 and parts[-1] == "player":
+            return parts[-2]
+        # Fallback: class name
+        return self.user_bot.__class__.__name__
+
+    def __repr__(self) -> str:
+        return f"SandboxedPlayer({self.display_name})"
+
     def _boot_sandbox(self):
         if self.process:
             self.process.terminate()

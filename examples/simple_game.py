@@ -22,7 +22,8 @@ def print_game_state(table: Table, street: str = ""):
         status = "BUSTED" if info.busted else ("ACTIVE" if info.active else "FOLDED")
         button = " [BTN]" if i == table.button_position else ""
         hole = table.player_hole_cards[i] if table.player_hole_cards[i] else "???"
-        print(f"  Player {i}{button}: {player.__class__.__name__:12} | "
+        name = getattr(player, "display_name", player.__class__.__name__)
+        print(f"  Player {i}{button}: {name:12} | "
               f"Stack: {info.stack:4} | Bet: {info.current_bet:3} | "
               f"Cards: {hole} | {status}")
     print('='*60)
@@ -80,7 +81,8 @@ def main():
                     hole = table.player_hole_cards[idx]
                     hand_name = details['hands'].get(idx, '?')
                     hand_display = hand_name.replace('_', ' ').title() if hand_name != '?' else '?'
-                    print(f"  Player {idx} ({table.players[idx].__class__.__name__}): "
+                    name = getattr(table.players[idx], "display_name", table.players[idx].__class__.__name__)
+                    print(f"  Player {idx} ({name}): "
                           f"{hole} - {hand_display}")
             else:
                 from src.helpers.hand_judge import HandJudge
@@ -89,7 +91,8 @@ def main():
                         table.player_hole_cards[winner_idx],
                         table.community_cards
                     )
-                    print(f"  Player {winner_idx} ({table.players[winner_idx].__class__.__name__}): "
+                    name = getattr(table.players[winner_idx], "display_name", table.players[winner_idx].__class__.__name__)
+                    print(f"  Player {winner_idx} ({name}): "
                           f"{table.player_hole_cards[winner_idx]} - {hand_eval[0].replace('_', ' ').title()}")
         elif result['ended_early']:
             print(f"\n--- Hand ended after {result['final_street']} (all but one folded) ---")
