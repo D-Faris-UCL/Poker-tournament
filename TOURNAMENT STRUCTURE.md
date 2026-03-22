@@ -140,9 +140,11 @@ The following parameters are set by the organiser prior to the tournament:
 ## Live Showdown
 
 📅 Date: Thursday, 26th March
+
 🕰️ Time: 5:30 pm - 8:30 pm
+
 📍 Location: Roberts Building, 421
 
-Bot submission:
-https://tinyurl.com/bdfre4wt
+Bot submission: https://tinyurl.com/bdfre4wt
+
 Deadline - 22nd March, 23:59
