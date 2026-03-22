@@ -133,3 +133,16 @@ The following parameters are set by the organiser prior to the tournament:
 - Each bot is subject to a **3-second decision time limit** and **500MB memory limit**
 - Invalid actions are automatically corrected per the rules described in `README.md`
 - Bots may use state accumulated during qualifying hands when playing at the final table, as long as it was stored in memory within their bot instance
+
+
+---
+
+## Live Showdown
+
+📅 Date: Thursday, 26th March
+🕰️ Time: 5:30 pm - 8:30 pm
+📍 Location: Roberts Building, 421
+
+Bot submission:
+https://tinyurl.com/bdfre4wt
+Deadline - 22nd March, 23:59
