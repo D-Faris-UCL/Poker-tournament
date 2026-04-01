@@ -25,7 +25,7 @@ def sandbox_worker(user_bot_instance, conn):
 class SandboxedPlayer:
     """The Table talks to this, thinking it's the real player."""
     
-    def __init__(self, user_bot_instance, max_ram_mb=500, time_limit=1.0):
+    def __init__(self, user_bot_instance, max_ram_mb=500, time_limit=3.0):
         self.user_bot = user_bot_instance # The class the user defined
         self.max_ram = max_ram_mb
         self.time_limit = time_limit
@@ -82,7 +82,7 @@ class SandboxedPlayer:
         if self.conn.poll(timeout=self.time_limit):
             return self.conn.recv()
         else:
-            print("[!] Bot took too long! Forcing fold and restarting.")
+            print(self.user_bot.__class__.__name__, "[!] Bot took too long! Forcing fold and restarting.")
             self._boot_sandbox() # Nuke it to stop the infinite loop
             return "fold", 0
         

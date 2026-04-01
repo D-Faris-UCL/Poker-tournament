@@ -58,6 +58,7 @@ def main():
         players=bots,
         starting_stack=2000,
         blinds_schedule=blinds_schedule,
+        restricted=True,
     )
 
     # Play a few hands
@@ -117,8 +118,8 @@ def main():
     print("DEMO COMPLETE!")
     print("="*60)
     print(time.time()-begin)
-    for player in table.players:
-        player.close()
+    # for player in table.players:
+    #     player.close()
 
 
 if __name__ == "__main__":
